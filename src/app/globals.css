@@ -24,3 +24,27 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* League of Legends themed styles */
+.lol-gradient {
+  background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+}
+
+.match-card {
+  transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+}
+
+.match-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+}
+
+.victory-border {
+  border-left: 4px solid #10b981;
+  background: linear-gradient(to right, #f0fdf4, #ffffff);
+}
+
+.defeat-border {
+  border-left: 4px solid #ef4444;
+  background: linear-gradient(to right, #fef2f2, #ffffff);
+}

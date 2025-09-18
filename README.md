@@ -1,36 +1,59 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# League of Legends Match History Tracker
 
-## Getting Started
+A Next.js application that fetches and displays the last 10 matches for any League of Legends player using the Riot Games API.
 
-First, run the development server:
+## Features
+
+- Search by summoner name and tag (e.g., "Hide on bush#KR1")
+- Display last 10 matches with detailed statistics
+- Show damage dealt, teammates, KDA, and more
+- Real-time data fetching from Riot API
+- Responsive UI built with Tailwind CSS
+
+## Setup Instructions
+
+### 1. Get a Riot API Key
+
+1. Visit [Riot Developer Portal](https://developer.riotgames.com/)
+2. Sign in with your Riot account
+3. Create a new app to get your API key
+
+### 2. Environment Variables
+
+Create a `.env.local` file in the root directory and add your Riot API key:
+
+```env
+RIOT_API_KEY=your_riot_api_key_here
+NEXT_PUBLIC_DEFAULT_REGION=na1
+```
+
+### 3. Install Dependencies
+
+```bash
+npm install
+```
+
+### 4. Run the Development Server
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000) with your browser to see the application.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Tech Stack
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- **Next.js 15** with App Router
+- **TypeScript** for type safety
+- **Tailwind CSS v4** for styling
+- **Riot Games API** for League of Legends data
 
-## Learn More
+## API Endpoints Used
 
-To learn more about Next.js, take a look at the following resources:
+- Account API: Get summoner info by name and tag
+- Summoner API: Get summoner details
+- Match API: Get match history and match details
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Rate Limits
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Personal API keys are limited to 100 requests every 2 minutes. Production keys have higher limits.
