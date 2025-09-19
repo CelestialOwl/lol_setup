@@ -5,6 +5,7 @@
 Your League of Legends match history tracker is now complete! Here's what we've implemented:
 
 ### 🚀 Features
+
 - **Search by Summoner Name & Tag**: Enter any player's name and tag (e.g., "Hide on bush#KR1")
 - **Real-time Data**: Fetches live data from Riot Games API
 - **Match History**: Displays the last 10 matches with detailed statistics
@@ -14,6 +15,7 @@ Your League of Legends match history tracker is now complete! Here's what we've 
 - **Error Handling**: Proper error messages and loading states
 
 ### 🛠 Tech Stack
+
 - **Next.js 15** with App Router and TypeScript
 - **Tailwind CSS v4** for modern, responsive styling
 - **Riot Games API** integration
@@ -57,6 +59,7 @@ The app will be available at [http://localhost:3000](http://localhost:3000)
 4. **View Results**: Browse through match history with detailed stats
 
 ### Example Searches
+
 - Name: "Hide on bush", Tag: "KR1", Region: Korea
 - Name: "Doublelift", Tag: "NA1", Region: North America
 - Name: "Caps", Tag: "EUW", Region: Europe West
@@ -90,23 +93,29 @@ src/
 ## 🎨 Features Implemented
 
 ### Search Component
+
 - Input validation
 - Region selection
 - Loading states
 - Form submission handling
 
 ### Match History Display
+
 - Last 10 matches
-- Win/Loss indicators
-- Champion played
-- KDA (Kills/Deaths/Assists)
-- Damage dealt to champions
-- Gold earned
-- Teammates list
-- Game duration and date
-- Match summary statistics
+
+### **Stats Displayed:**
+
+- ✅ Win/Loss results with visual indicators
+- ✅ Champion played in each match
+- ✅ KDA (Kills/Deaths/Assists)
+- ✅ Damage dealt to champions
+- ✅ Gold earned
+- ✅ Teammates names with their current ranks
+- ✅ Game duration and date
+- ✅ Match summary with win rate
 
 ### Error Handling
+
 - API rate limit messages
 - Summoner not found errors
 - Network error handling

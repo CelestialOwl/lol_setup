@@ -1,6 +1,6 @@
-'use client';
+"use client";
 
-import { SummonerData, PlayerMatch } from '@/types/riot-api';
+import { PlayerMatch, SummonerData } from "@/types/riot-api";
 
 interface MatchHistoryProps {
   summonerData: SummonerData;
@@ -16,7 +16,7 @@ export default function MatchHistory({ summonerData }: MatchHistoryProps) {
     );
 
     if (!playerData) {
-      throw new Error('Player not found in match data');
+      throw new Error("Player not found in match data");
     }
 
     // Get teammates (same team, excluding the player)
@@ -26,7 +26,13 @@ export default function MatchHistory({ summonerData }: MatchHistoryProps) {
           participant.teamId === playerData.teamId &&
           participant.puuid !== account.puuid
       )
-      .map((teammate) => teammate.summonerName);
+      .map((teammate) => ({
+        puuid: teammate.puuid,
+        gameName: teammate.riotIdGameName,
+        rank: teammate.teammateRankInfo?.rank,
+        tier: teammate.teammateRankInfo?.tier,
+        leaguePoints: teammate.teammateRankInfo?.leaguePoints,
+      }));
 
     return {
       matchId: match.metadata.matchId,
@@ -47,21 +53,69 @@ export default function MatchHistory({ summonerData }: MatchHistoryProps) {
   const formatDuration = (seconds: number): string => {
     const minutes = Math.floor(seconds / 60);
     const remainingSeconds = seconds % 60;
-    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
+    return `${minutes}:${remainingSeconds.toString().padStart(2, "0")}`;
   };
 
   const formatDate = (date: Date): string => {
-    return date.toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
+    return date.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
     });
   };
 
   const getKDA = (kills: number, deaths: number, assists: number): string => {
     const kda = deaths === 0 ? kills + assists : (kills + assists) / deaths;
     return kda.toFixed(2);
+  };
+
+  const formatRank = (
+    tier?: string,
+    rank?: string,
+    leaguePoints?: number
+  ): string => {
+    if (!tier || !rank) return "Unranked";
+
+    // Handle special tiers that don't have ranks
+    if (tier === "MASTER" || tier === "GRANDMASTER" || tier === "CHALLENGER") {
+      return `${tier.charAt(0) + tier.slice(1).toLowerCase()} ${
+        leaguePoints || 0
+      } LP`;
+    }
+
+    // Format regular tiers
+    const formattedTier = tier.charAt(0) + tier.slice(1).toLowerCase();
+    return `${formattedTier} ${rank} ${leaguePoints || 0} LP`;
+  };
+
+  const getRankColor = (tier?: string): string => {
+    if (!tier) return "text-gray-500";
+
+    switch (tier.toUpperCase()) {
+      case "IRON":
+        return "text-gray-600";
+      case "BRONZE":
+        return "text-amber-600";
+      case "SILVER":
+        return "text-gray-400";
+      case "GOLD":
+        return "text-yellow-500";
+      case "PLATINUM":
+        return "text-cyan-500";
+      case "EMERALD":
+        return "text-emerald-500";
+      case "DIAMOND":
+        return "text-blue-500";
+      case "MASTER":
+        return "text-purple-500";
+      case "GRANDMASTER":
+        return "text-red-500";
+      case "CHALLENGER":
+        return "text-orange-500";
+      default:
+        return "text-gray-500";
+    }
   };
 
   return (
@@ -91,7 +145,7 @@ export default function MatchHistory({ summonerData }: MatchHistoryProps) {
           <div
             key={match.matchId}
             className={`bg-white rounded-lg shadow-md p-4 border-l-4 ${
-              match.win ? 'border-green-500' : 'border-red-500'
+              match.win ? "border-green-500" : "border-red-500"
             }`}
           >
             <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
@@ -101,11 +155,11 @@ export default function MatchHistory({ summonerData }: MatchHistoryProps) {
                   <span
                     className={`px-2 py-1 rounded text-sm font-semibold ${
                       match.win
-                        ? 'bg-green-100 text-green-800'
-                        : 'bg-red-100 text-red-800'
+                        ? "bg-green-100 text-green-800"
+                        : "bg-red-100 text-red-800"
                     }`}
                   >
-                    {match.win ? 'Victory' : 'Defeat'}
+                    {match.win ? "Victory" : "Defeat"}
                   </span>
                 </div>
                 <p className="text-sm text-gray-600">{match.gameMode}</p>
@@ -142,9 +196,7 @@ export default function MatchHistory({ summonerData }: MatchHistoryProps) {
                 </div>
                 <div>
                   <p className="text-sm text-gray-600">Gold</p>
-                  <p className="font-semibold">
-                    {match.gold.toLocaleString()}
-                  </p>
+                  <p className="font-semibold">{match.gold.toLocaleString()}</p>
                 </div>
               </div>
 
@@ -153,9 +205,22 @@ export default function MatchHistory({ summonerData }: MatchHistoryProps) {
                 <p className="text-sm text-gray-600">Teammates</p>
                 <div className="space-y-1">
                   {match.teammates.slice(0, 4).map((teammate, idx) => (
-                    <p key={idx} className="text-sm truncate">
-                      {teammate}
-                    </p>
+                    <div key={idx} className="text-sm">
+                      <p className="truncate font-medium">
+                        {teammate.gameName}
+                      </p>
+                      <p
+                        className={`text-xs truncate font-semibold ${getRankColor(
+                          teammate.tier
+                        )}`}
+                      >
+                        {formatRank(
+                          teammate.tier,
+                          teammate.rank,
+                          teammate.leaguePoints
+                        )}
+                      </p>
+                    </div>
                   ))}
                 </div>
               </div>
@@ -188,7 +253,8 @@ export default function MatchHistory({ summonerData }: MatchHistoryProps) {
                 (playerMatches.filter((m) => m.win).length /
                   playerMatches.length) *
                 100
-              ).toFixed(0)}%
+              ).toFixed(0)}
+              %
             </p>
             <p className="text-sm text-gray-600">Win Rate</p>
           </div>

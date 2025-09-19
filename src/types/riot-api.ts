@@ -15,6 +15,30 @@ export interface Summoner {
   summonerLevel: number;
 }
 
+export interface LeagueEntry {
+  leagueId: string;
+  summonerId: string;
+  summonerName: string;
+  queueType: string;
+  tier: string;
+  rank: string;
+  leaguePoints: number;
+  wins: number;
+  losses: number;
+  hotStreak: boolean;
+  veteran: boolean;
+  freshBlood: boolean;
+  inactive: boolean;
+}
+
+export interface TeammateInfo {
+  puuid: string;
+  gameName: string;
+  rank?: string;
+  tier?: string;
+  leaguePoints?: number;
+}
+
 export interface Participant {
   puuid: string;
   championId: number;
@@ -25,6 +49,7 @@ export interface Participant {
   deaths: number;
   assists: number;
   totalDamageDealtToChampions: number;
+  riotIdGameName: string;
   goldEarned: number;
   wardsPlaced: number;
   win: boolean;
@@ -37,6 +62,7 @@ export interface Participant {
   item6: number;
   summoner1Id: number;
   summoner2Id: number;
+  teammateRankInfo?: TeammateInfo;
 }
 
 export interface Team {
@@ -97,7 +123,7 @@ export interface PlayerMatch {
   gameMode: string;
   gameDuration: number;
   gameDate: Date;
-  teammates: string[];
+  teammates: TeammateInfo[];
 }
 
 export interface SearchFormData {
