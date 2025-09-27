@@ -49,6 +49,16 @@ GET /lol/league/v4/entries/by-puuid/{encryptedPUUID}
 - **Purpose**: Get league entries for a summoner by their PUUID
 - **Response**: Array of league entries including rank, tier, LP
 
+### 6. Get Current Game (Spectator API)
+
+```
+GET /lol/spectator/v5/active-games/by-summoner/{encryptedPUUID}
+```
+
+- **Purpose**: Get information about a player's current live game
+- **Response**: Current game data including participants, bans, game duration
+- **Note**: Returns 404 if player is not in an active game
+
 ## Regional Routing
 
 ### Account API (Americas, Asia, Europe)

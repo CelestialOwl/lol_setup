@@ -1,4 +1,4 @@
-'use client';
+"use client";
 
 interface ErrorDisplayProps {
   error: string;
@@ -41,16 +41,18 @@ export default function ErrorDisplay({ error, onRetry }: ErrorDisplayProps) {
   );
 }
 
-export function LoadingSpinner() {
+export function LoadingSpinner({ message }: { message?: string }) {
   return (
     <div className="w-full max-w-2xl mx-auto p-6">
       <div className="bg-white rounded-lg shadow-lg p-8 text-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
         <h3 className="text-lg font-semibold text-gray-800 mb-2">
-          Loading match data...
+          {message || "Loading match data..."}
         </h3>
         <p className="text-gray-600">
-          Fetching summoner information and match history from Riot API
+          {message?.includes("live")
+            ? "Checking if player is currently in a game..."
+            : "Fetching summoner information and match history from Riot API"}
         </p>
       </div>
     </div>

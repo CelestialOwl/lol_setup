@@ -1,7 +1,9 @@
 import {
   Account,
   ApiError,
+  CurrentGameInfo,
   LeagueEntry,
+  LiveGameData,
   Match,
   Summoner,
   SummonerData,
@@ -296,6 +298,58 @@ class RiotApiService {
       throw new Error(
         "An unexpected error occurred while fetching summoner data"
       );
+    }
+  }
+
+  async getCurrentGame(
+    gameName: string,
+    tagLine: string,
+    region: string
+  ): Promise<LiveGameData | null> {
+    try {
+      // First get account info
+      const account = await this.getAccountByRiotId(gameName, tagLine, region);
+
+      // Get current game info using PUUID directly
+      const endpoints = REGIONAL_ENDPOINTS[region as Region];
+      if (!endpoints) {
+        throw new Error(`Unsupported region: ${region}`);
+      }
+
+      const url = `https://${endpoints.platform}/lol/spectator/v5/active-games/by-summoner/${account.puuid}`;
+      const gameInfo = await this.makeRequest<CurrentGameInfo>(url);
+
+      // Find the searched player using PUUID
+      const searchedPlayer = gameInfo.participants.find(
+        (p) => p.puuid === account.puuid
+      );
+      if (!searchedPlayer) {
+        throw new Error("Player not found in game data");
+      }
+
+      // Split participants into teams
+      const playerTeam = gameInfo.participants.filter(
+        (p) => p.teamId === searchedPlayer.teamId
+      );
+      const enemyTeam = gameInfo.participants.filter(
+        (p) => p.teamId !== searchedPlayer.teamId
+      );
+
+      return {
+        gameInfo,
+        playerTeam,
+        enemyTeam,
+        searchedPlayer,
+      };
+    } catch (error) {
+      if (error && typeof error === "object" && "status" in error) {
+        const apiError = error as ApiError;
+        if (apiError.status === 404) {
+          // Player is not in an active game
+          return null;
+        }
+      }
+      throw error;
     }
   }
 }

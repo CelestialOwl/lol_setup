@@ -9,6 +9,7 @@ Your League of Legends match history tracker is now complete! Here's what we've 
 - **Search by Summoner Name & Tag**: Enter any player's name and tag (e.g., "Hide on bush#KR1")
 - **Real-time Data**: Fetches live data from Riot Games API
 - **Match History**: Displays the last 10 matches with detailed statistics
+- **Live Game Tracking**: Shows if a player is currently in a game with team compositions
 - **Comprehensive Stats**: Shows KDA, damage dealt, gold earned, teammates, and more
 - **Win/Loss Tracking**: Visual indicators and summary statistics
 - **Responsive Design**: Works perfectly on desktop and mobile
