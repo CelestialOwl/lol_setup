@@ -98,6 +98,20 @@ func (r *RiotAPIService) GetCurrentGameInfo(summonerID, region string) (*models.
 	return &liveGame, nil
 }
 
+// GetCurrentGameByPUUID fetches live game data using the spectator v5 API with PUUID.
+// Returns the raw Riot API response as a generic map so no field mapping is needed.
+func (r *RiotAPIService) GetCurrentGameByPUUID(puuid, region string) (map[string]interface{}, error) {
+	url := fmt.Sprintf("https://%s.api.riotgames.com/lol/spectator/v5/active-games/by-summoner/%s",
+		region, puuid)
+
+	var gameData map[string]interface{}
+	if err := r.makeRequest(url, &gameData); err != nil {
+		return nil, err
+	}
+
+	return gameData, nil
+}
+
 // makeRequest makes an HTTP request to the Riot API
 func (r *RiotAPIService) makeRequest(url string, dest interface{}) error {
 	req, err := http.NewRequest("GET", url, nil)
@@ -105,6 +119,7 @@ func (r *RiotAPIService) makeRequest(url string, dest interface{}) error {
 		return err
 	}
 
+	fmt.Println("Making request to Riot API:", url, r.apiKey) // Debug log for request URL
 	req.Header.Set("X-Riot-Token", r.apiKey)
 	req.Header.Set("Content-Type", "application/json")
 

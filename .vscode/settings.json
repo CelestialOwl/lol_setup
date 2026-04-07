@@ -1,0 +1,4 @@
+{
+    "go.goroot": "/opt/homebrew/opt/go/libexec",
+    "go.gopath": "${env:HOME}/go-workspace"
+}

@@ -43,9 +43,11 @@ func main() {
 	// Initialize services
 	riotAPIService := services.NewRiotAPIService(cfg.RiotAPIKey)
 	summonerService := services.NewSummonerService(summonerRepo, matchRepo, riotAPIService, redisClient, cfg)
+	liveGameService := services.NewLiveGameService(riotAPIService)
 
 	// Initialize handlers
 	summonerHandler := handlers.NewSummonerHandler(summonerService)
+	liveGameHandler := handlers.NewLiveGameHandler(liveGameService)
 
 	// Initialize Gin router
 	router := gin.New()
@@ -78,19 +80,8 @@ func main() {
 			summoner.POST("/search", summonerHandler.SearchSummoner)
 			summoner.GET("/:puuid/stats", summonerHandler.GetSummonerStats)
 		}
-
-		// Match routes (future implementation)
-		// matches := api.Group("/matches")
-		// {
-		//     matches.GET("/:matchId", matchHandler.GetMatch)
-		//     matches.GET("/recent/:puuid", matchHandler.GetRecentMatches)
-		// }
-
-		// Live game routes (future implementation)
-		// live := api.Group("/live")
-		// {
-		//     live.GET("/:puuid", liveHandler.GetCurrentGame)
-		// }
+		// Live game route
+		api.GET("/live-game", liveGameHandler.GetLiveGame)
 	}
 
 	// Start server
