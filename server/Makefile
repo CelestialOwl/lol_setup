@@ -42,24 +42,24 @@ docker-build:
 	docker build -t $(DOCKER_IMAGE):$(DOCKER_TAG) .
 
 docker-run:
-	docker-compose up --build
+	docker compose up --build
 
 docker-stop:
-	docker-compose down
+	docker compose down
 
 docker-clean:
-	docker-compose down -v
+	docker compose down -v
 	docker rmi $(DOCKER_IMAGE):$(DOCKER_TAG) || true
 
 # Database commands
 db-up:
-	docker-compose up postgres redis -d
+	docker compose up postgres redis -d
 
 db-down:
-	docker-compose stop postgres redis
+	docker compose stop postgres redis
 
 db-migrate:
-	docker-compose exec postgres psql -U postgres -d lol_tracker -f /docker-entrypoint-initdb.d/001_init.sql
+	docker compose exec postgres psql -U postgres -d lol_tracker -f /docker-entrypoint-initdb.d/001_init.sql
 
 # Development commands
 dev:
