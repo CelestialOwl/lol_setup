@@ -1,82 +1,121 @@
-# Go parameters
-GOCMD=go
-GOBUILD=$(GOCMD) build
-GOCLEAN=$(GOCMD) clean
-GOTEST=$(GOCMD) test
-GOGET=$(GOCMD) get
-GOMOD=$(GOCMD) mod
-BINARY_NAME=lol-match-tracker
-BINARY_UNIX=$(BINARY_NAME)_unix
+# ──────────────────────────────────────────────────────────────────────────────
+# LoL Match Tracker — Makefile
+# ──────────────────────────────────────────────────────────────────────────────
+# Quick reference:
+#   make dev-local   → DB in Docker + Go server locally (fastest iteration)
+#   make dev-docker  → Everything in Docker (tests the full stack)
+#   make migrate-up  → Apply all pending migrations (requires migrate CLI)
+#   make test        → Run all Go tests
+# ──────────────────────────────────────────────────────────────────────────────
 
-# Docker parameters
-DOCKER_IMAGE=lol-match-tracker-api
-DOCKER_TAG=latest
+# Go
+GOCMD   = go
+GOBUILD = $(GOCMD) build
+GOTEST  = $(GOCMD) test
+GOMOD   = $(GOCMD) mod
+BINARY  = lol-match-tracker
 
+# Docker
+DOCKER_IMAGE = lol-match-tracker-api
+DOCKER_TAG   = latest
+
+# golang-migrate
+# Local dev DB URL — override with DB_URL=... if your creds differ
+DB_URL ?= postgres://postgres:postgres123@localhost:5432/lol_tracker?sslmode=disable
+
+# ── Build ──────────────────────────────────────────────────────────────────────
 all: test build
 
 build:
-	$(GOBUILD) -o $(BINARY_NAME) -v ./cmd/server
+	$(GOBUILD) -o $(BINARY) -v ./cmd/server
 
 test:
 	$(GOTEST) -v ./...
 
 clean:
-	$(GOCLEAN)
-	rm -f $(BINARY_NAME)
-	rm -f $(BINARY_UNIX)
-
-run:
-	$(GOBUILD) -o $(BINARY_NAME) -v ./cmd/server
-	./$(BINARY_NAME)
+	rm -f $(BINARY) $(BINARY)_unix
 
 deps:
 	$(GOMOD) download
 	$(GOMOD) tidy
 
-# Cross compilation
-build-linux:
-	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 $(GOBUILD) -o $(BINARY_UNIX) -v ./cmd/server
-
-# Docker commands
-docker-build:
-	docker build -t $(DOCKER_IMAGE):$(DOCKER_TAG) .
-
-docker-run:
-	docker compose up --build
-
-docker-stop:
-	docker compose down
-
-docker-clean:
-	docker compose down -v
-	docker rmi $(DOCKER_IMAGE):$(DOCKER_TAG) || true
-
-# Database commands
-db-up:
-	docker compose up postgres redis -d
-
-db-down:
-	docker compose stop postgres redis
-
-db-migrate:
-	docker compose exec postgres psql -U postgres -d lol_tracker -f /docker-entrypoint-initdb.d/001_init.sql
-
-# Development commands
-dev:
-	air
-
-install-air:
-	go install github.com/cosmtrek/air@latest
-
-# Format and lint
 fmt:
 	go fmt ./...
 
 vet:
 	go vet ./...
 
-# Generate go.sum
-mod-verify:
-	$(GOMOD) verify
+# ── Local development ──────────────────────────────────────────────────────────
+# dev-local: Postgres + Redis run in Docker; the Go binary runs on your machine.
+#   - Fastest option: no Docker rebuild on every Go change.
+#   - Requires: Docker + air (`make install-air`)
+#   Steps: start DBs, apply schema, then hot-reload the Go server.
+dev-local: db-up migrate-up
+	air
 
-.PHONY: all build test clean run deps build-linux docker-build docker-run docker-stop docker-clean db-up db-down db-migrate dev install-air fmt vet mod-verify
+# dev-docker: The full stack (DB + Redis + Go API) runs inside Docker Compose.
+#   - Use this to test that the container image builds and works end-to-end.
+#   - Slower iteration because Docker must rebuild the image on Go changes.
+dev-docker:
+	docker compose up --build
+
+install-air:
+	go install github.com/cosmtrek/air@latest
+
+# ── Docker ────────────────────────────────────────────────────────────────────
+docker-build:
+	docker build -t $(DOCKER_IMAGE):$(DOCKER_TAG) .
+
+docker-stop:
+	docker compose down
+
+docker-clean:
+	docker compose down -v
+	docker rmi $(DOCKER_IMAGE):$(DOCKER_TAG) 2>/dev/null || true
+
+# ── Database services ──────────────────────────────────────────────────────────
+# db-up: starts only Postgres + Redis (no API container).
+db-up:
+	docker compose up postgres redis -d
+
+db-down:
+	docker compose stop postgres redis
+
+# ── Migrations (golang-migrate) ────────────────────────────────────────────────
+# How it works:
+#   1. golang-migrate reads ./migrations/*.up.sql / *.down.sql files.
+#   2. It creates a `schema_migrations` table in Postgres to track which
+#      migrations have been applied (by version number).
+#   3. `migrate up`   → runs all unapplied *.up.sql files in version order.
+#   4. `migrate down` → rolls back the last applied migration via *.down.sql.
+#   5. IF NOT EXISTS in the SQL makes re-runs idempotent.
+#
+# Install the CLI once with:  make migrate-install
+
+MIGRATE = migrate
+
+migrate-install:
+	go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@latest
+
+migrate-up:
+	$(MIGRATE) -path ./migrations -database "$(DB_URL)" up
+
+migrate-down:
+	$(MIGRATE) -path ./migrations -database "$(DB_URL)" down 1
+
+migrate-status:
+	$(MIGRATE) -path ./migrations -database "$(DB_URL)" version
+
+migrate-drop:
+	$(MIGRATE) -path ./migrations -database "$(DB_URL)" drop -f
+
+# ── Cross-compilation ──────────────────────────────────────────────────────────
+build-linux:
+	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 $(GOBUILD) -o $(BINARY)_unix -v ./cmd/server
+
+.PHONY: all build test clean deps fmt vet \
+        dev-local dev-docker install-air \
+        docker-build docker-stop docker-clean \
+        db-up db-down \
+        migrate-install migrate-up migrate-down migrate-status migrate-drop \
+        build-linux

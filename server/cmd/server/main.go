@@ -1,7 +1,13 @@
 package main
 
 import (
-	"log"
+	"context"
+	"log/slog"
+	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"lol-match-tracker/internal/cache"
 	"lol-match-tracker/internal/config"
@@ -25,14 +31,16 @@ func main() {
 	// Initialize database
 	db, err := database.NewPostgresDB(cfg)
 	if err != nil {
-		log.Fatalf("Failed to connect to database: %v", err)
+		slog.Error("failed to connect to database", "error", err)
+		os.Exit(1)
 	}
 	defer db.Close()
 
 	// Initialize Redis cache
 	redisClient, err := cache.NewRedisClient(cfg)
 	if err != nil {
-		log.Fatalf("Failed to connect to Redis: %v", err)
+		slog.Error("failed to connect to Redis", "error", err)
+		os.Exit(1)
 	}
 	defer redisClient.Close()
 
@@ -53,18 +61,35 @@ func main() {
 	router := gin.New()
 
 	// Middleware
+	router.Use(middleware.RequestID())
 	router.Use(middleware.Logger())
 	router.Use(middleware.ErrorHandler())
 	router.Use(cors.New(cors.Config{
 		AllowOrigins:     cfg.AllowedOrigins,
 		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-		AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization", "X-Requested-With"},
+		AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization", "X-Requested-With", "X-Request-ID"},
 		AllowCredentials: true,
 	}))
 
-	// Health check endpoint
+	// Health check endpoint — verifies DB and Redis are reachable
 	router.GET("/health", func(c *gin.Context) {
-		c.JSON(200, gin.H{
+		if err := db.Ping(); err != nil {
+			c.JSON(http.StatusServiceUnavailable, gin.H{
+				"status": "degraded",
+				"db":     "unhealthy",
+				"error":  err.Error(),
+			})
+			return
+		}
+		if err := redisClient.Ping(); err != nil {
+			c.JSON(http.StatusServiceUnavailable, gin.H{
+				"status": "degraded",
+				"redis":  "unhealthy",
+				"error":  err.Error(),
+			})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{
 			"status":  "ok",
 			"service": "lol-match-tracker-api",
 		})
@@ -76,20 +101,44 @@ func main() {
 		// Summoner routes
 		summoner := api.Group("/summoner")
 		{
-			summoner.GET("", summonerHandler.GetSummoner)
-			summoner.POST("/search", summonerHandler.SearchSummoner)
-			summoner.GET("/:puuid/stats", summonerHandler.GetSummonerStats)
+			summoner.GET("", summonerHandler.GetSummoner)                    // profile only
+			summoner.POST("/search", summonerHandler.SearchSummoner)         // same as GET but via POST body
+			summoner.GET("/:puuid/matches", summonerHandler.GetMatchHistory) // match history
+			summoner.GET("/:puuid/stats", summonerHandler.GetSummonerStats)  // aggregate stats
 		}
 		// Live game route
 		api.GET("/live-game", liveGameHandler.GetLiveGame)
 	}
 
-	// Start server
-	port := ":" + cfg.Port
-	log.Printf("Starting server on port %s", port)
-	log.Printf("Allowed origins: %v", cfg.AllowedOrigins)
-
-	if err := router.Run(port); err != nil {
-		log.Fatalf("Failed to start server: %v", err)
+	// Start server with graceful shutdown
+	addr := ":" + cfg.Port
+	srv := &http.Server{
+		Addr:         addr,
+		Handler:      router,
+		ReadTimeout:  15 * time.Second,
+		WriteTimeout: 15 * time.Second,
+		IdleTimeout:  60 * time.Second,
 	}
+
+	slog.Info("starting server", "addr", addr, "allowed_origins", cfg.AllowedOrigins)
+
+	go func() {
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			slog.Error("server error", "error", err)
+			os.Exit(1)
+		}
+	}()
+
+	// Block until OS signal received
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+	<-quit
+
+	slog.Info("shutting down server…")
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if err := srv.Shutdown(ctx); err != nil {
+		slog.Error("server forced shutdown", "error", err)
+	}
+	slog.Info("server stopped")
 }

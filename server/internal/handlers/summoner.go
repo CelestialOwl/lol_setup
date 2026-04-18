@@ -22,16 +22,13 @@ func NewSummonerHandler(summonerService *services.SummonerService) *SummonerHand
 	}
 }
 
-// GetSummoner handles summoner data requests
+// GetSummoner handles GET /api/summoner — returns profile only (fast).
 func (h *SummonerHandler) GetSummoner(c *gin.Context) {
 	var req models.SearchRequest
-
-	// Get query parameters
 	req.GameName = c.Query("gameName")
 	req.TagLine = c.Query("tagLine")
 	req.Region = c.DefaultQuery("region", "na1")
 
-	// Validate request
 	if err := h.validator.Struct(req); err != nil {
 		c.JSON(http.StatusBadRequest, models.ErrorResponse{
 			Error:   "Validation failed",
@@ -41,11 +38,35 @@ func (h *SummonerHandler) GetSummoner(c *gin.Context) {
 		return
 	}
 
-	// Get summoner data
-	response, err := h.summonerService.GetSummonerData(req.GameName, req.TagLine, req.Region)
+	response, err := h.summonerService.GetSummonerProfile(req.GameName, req.TagLine, req.Region)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse{
-			Error:   "Failed to fetch summoner data",
+			Error:   "Failed to fetch summoner profile",
+			Message: err.Error(),
+			Code:    http.StatusInternalServerError,
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, response)
+}
+
+// GetMatchHistory handles GET /api/summoner/:puuid/matches
+func (h *SummonerHandler) GetMatchHistory(c *gin.Context) {
+	puuid := c.Param("puuid")
+	if puuid == "" {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{
+			Error: "PUUID is required",
+			Code:  http.StatusBadRequest,
+		})
+		return
+	}
+	region := c.DefaultQuery("region", "na1")
+
+	response, err := h.summonerService.GetMatchHistory(puuid, region)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse{
+			Error:   "Failed to fetch match history",
 			Message: err.Error(),
 			Code:    http.StatusInternalServerError,
 		})
@@ -79,7 +100,7 @@ func (h *SummonerHandler) GetSummonerStats(c *gin.Context) {
 	c.JSON(http.StatusOK, stats)
 }
 
-// SearchSummoner handles POST requests for summoner search
+// SearchSummoner handles POST /api/summoner/search — returns profile only.
 func (h *SummonerHandler) SearchSummoner(c *gin.Context) {
 	var req models.SearchRequest
 
@@ -92,7 +113,6 @@ func (h *SummonerHandler) SearchSummoner(c *gin.Context) {
 		return
 	}
 
-	// Validate request
 	if err := h.validator.Struct(req); err != nil {
 		c.JSON(http.StatusBadRequest, models.ErrorResponse{
 			Error:   "Validation failed",
@@ -102,11 +122,10 @@ func (h *SummonerHandler) SearchSummoner(c *gin.Context) {
 		return
 	}
 
-	// Get summoner data
-	response, err := h.summonerService.GetSummonerData(req.GameName, req.TagLine, req.Region)
+	response, err := h.summonerService.GetSummonerProfile(req.GameName, req.TagLine, req.Region)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse{
-			Error:   "Failed to fetch summoner data",
+			Error:   "Failed to fetch summoner profile",
 			Message: err.Error(),
 			Code:    http.StatusInternalServerError,
 		})

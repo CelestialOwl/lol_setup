@@ -4,10 +4,12 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"log/slog"
 	"time"
 
-	_ "github.com/lib/pq"
 	"lol-match-tracker/internal/config"
+
+	_ "github.com/lib/pq"
 )
 
 type DB struct {
@@ -35,7 +37,7 @@ func NewPostgresDB(cfg *config.Config) (*DB, error) {
 		return nil, fmt.Errorf("failed to ping database: %w", err)
 	}
 
-	log.Println("Successfully connected to PostgreSQL database")
+	slog.Info("connected to PostgreSQL", "host", cfg.DBHost, "port", cfg.DBPort, "db", cfg.DBName)
 	return &DB{db}, nil
 }
 

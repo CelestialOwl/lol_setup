@@ -1,0 +1,23 @@
+# Build outputs
+lol-match-tracker
+lol-match-tracker_unix
+main
+server
+
+# Development / environment files
+.env
+.env.*
+
+# Go test cache
+**/*_test.go
+
+# Editor / OS
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Git
+.git/
+.gitignore

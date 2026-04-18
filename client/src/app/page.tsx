@@ -5,20 +5,28 @@ import LiveGame, { NoActiveGame } from "@/components/LiveGame";
 import MatchHistory from "@/components/MatchHistory";
 import SearchComponent from "@/components/SearchComponent";
 import { LiveGameData, SearchFormData, SummonerData } from "@/types/riot-api";
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 type ViewMode = "match-history" | "live-game";
 
 export default function HomePage() {
   const [loading, setLoading] = useState(false);
+  // loadingStep drives the spinner message so users see what's happening
+  const [loadingStep, setLoadingStep] = useState<"profile" | "matches">("profile");
   const [error, setError] = useState<string | null>(null);
   const [summonerData, setSummonerData] = useState<SummonerData | null>(null);
   const [liveGameData, setLiveGameData] = useState<LiveGameData | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>("match-history");
   const [lastSearchedPlayer, setLastSearchedPlayer] = useState<string>("");
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   const handleSearch = async (searchData: SearchFormData) => {
+    abortControllerRef.current?.abort();
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
     setLoading(true);
+    setLoadingStep("profile");
     setError(null);
     setSummonerData(null);
     setLiveGameData(null);
@@ -32,20 +40,44 @@ export default function HomePage() {
       });
 
       if (viewMode === "match-history") {
-        const response = await fetch(`/api/summoner?${params}`);
-        const data = await response.json();
-
-        if (!response.ok) {
-          throw new Error(data.error || "Failed to fetch summoner data");
+        // ── Step 1: profile (fast — 2 Riot API calls max) ──────────────────
+        const profileRes = await fetch(`/api/summoner?${params}`, {
+          signal: controller.signal,
+        });
+        const profile = await profileRes.json();
+        if (!profileRes.ok) {
+          throw new Error(profile.error || "Failed to fetch summoner profile");
         }
 
-        setSummonerData(data);
+        // ── Step 2: match history (slower — up to 11 Riot API calls) ───────
+        setLoadingStep("matches");
+        const matchParams = new URLSearchParams({ region: searchData.region });
+        const matchesRes = await fetch(
+          `/api/summoner/${profile.account.puuid}/matches?${matchParams}`,
+          { signal: controller.signal }
+        );
+        const matchesJson = await matchesRes.json();
+        if (!matchesRes.ok) {
+          throw new Error(matchesJson.error || "Failed to fetch match history");
+        }
+
+        // Merge profile + matches into the shape MatchHistory expects
+        setSummonerData({
+          account:      profile.account,
+          summoner:     profile.summoner,
+          matchHistory: (matchesJson.matches ?? []).map(
+            (m: { metadata: { matchId: string } }) => m.metadata.matchId
+          ),
+          matches: matchesJson.matches ?? [],
+        });
       } else {
-        const response = await fetch(`/api/live-game?${params}`);
+        // ── Live game ──────────────────────────────────────────────────────
+        const response = await fetch(`/api/live-game?${params}`, {
+          signal: controller.signal,
+        });
         const data = await response.json();
 
         if (response.status === 404 && !data.inGame) {
-          // Player is not in game - this is not an error, just show the no active game message
           setLiveGameData(null);
         } else if (!response.ok) {
           throw new Error(data.error || "Failed to fetch live game data");
@@ -54,17 +86,14 @@ export default function HomePage() {
         }
       }
     } catch (err) {
-      const errorMessage =
-        err instanceof Error ? err.message : "An unexpected error occurred";
-      setError(errorMessage);
+      if (err instanceof Error && err.name === "AbortError") return;
+      setError(err instanceof Error ? err.message : "An unexpected error occurred");
     } finally {
       setLoading(false);
     }
   };
 
-  const handleRetry = () => {
-    setError(null);
-  };
+  const handleRetry = () => setError(null);
 
   const handleViewModeChange = (mode: ViewMode) => {
     setViewMode(mode);
@@ -72,6 +101,13 @@ export default function HomePage() {
     setLiveGameData(null);
     setError(null);
   };
+
+  const loadingMessage =
+    viewMode === "live-game"
+      ? "Checking live game status..."
+      : loadingStep === "profile"
+      ? "Finding summoner..."
+      : "Loading match history...";
 
   return (
     <main className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 py-8">
@@ -104,24 +140,14 @@ export default function HomePage() {
           </div>
         </div>
 
-        {loading && (
-          <LoadingSpinner
-            message={
-              viewMode === "live-game"
-                ? "Checking live game status..."
-                : "Loading match data..."
-            }
-          />
-        )}
+        {loading && <LoadingSpinner message={loadingMessage} />}
 
         {error && <ErrorDisplay error={error} onRetry={handleRetry} />}
 
-        {/* Match History View */}
         {viewMode === "match-history" && summonerData && !loading && !error && (
           <MatchHistory summonerData={summonerData} />
         )}
 
-        {/* Live Game View */}
         {viewMode === "live-game" && !loading && !error && (
           <>
             {liveGameData ? (

@@ -3,13 +3,20 @@ package cache
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"time"
 
-	"github.com/go-redis/redis/v8"
 	"lol-match-tracker/internal/config"
+
+	"github.com/go-redis/redis/v8"
 )
+
+// ErrCacheMiss is returned when a key is not found in the cache.
+// Callers should use errors.Is(err, cache.ErrCacheMiss) to distinguish a miss
+// from a genuine connection error.
+var ErrCacheMiss = errors.New("cache miss")
 
 type RedisClient struct {
 	client *redis.Client
@@ -31,11 +38,17 @@ func NewRedisClient(cfg *config.Config) (*RedisClient, error) {
 		return nil, fmt.Errorf("failed to connect to Redis: %w", err)
 	}
 
-	log.Println("Successfully connected to Redis")
+	slog.Info("connected to Redis", "addr", cfg.RedisURL)
 	return &RedisClient{
 		client: rdb,
 		ctx:    ctx,
 	}, nil
+}
+
+// Ping checks the Redis connection. Used by the health endpoint.
+func (r *RedisClient) Ping() error {
+	_, err := r.client.Ping(r.ctx).Result()
+	return err
 }
 
 func (r *RedisClient) Set(key string, value interface{}, ttl time.Duration) error {
@@ -51,7 +64,7 @@ func (r *RedisClient) Get(key string, dest interface{}) error {
 	val, err := r.client.Get(r.ctx, key).Result()
 	if err != nil {
 		if err == redis.Nil {
-			return fmt.Errorf("key not found")
+			return ErrCacheMiss
 		}
 		return fmt.Errorf("failed to get value: %w", err)
 	}
@@ -91,7 +104,7 @@ func (r *RedisClient) GetHash(key, field string, dest interface{}) error {
 	val, err := r.client.HGet(r.ctx, key, field).Result()
 	if err != nil {
 		if err == redis.Nil {
-			return fmt.Errorf("field not found")
+			return ErrCacheMiss
 		}
 		return fmt.Errorf("failed to get hash field: %w", err)
 	}

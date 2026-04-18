@@ -9,14 +9,15 @@ interface MatchHistoryProps {
 export default function MatchHistory({ summonerData }: MatchHistoryProps) {
   const { account, summoner, matches } = summonerData;
 
-  // Process matches to extract player-specific data
-  const playerMatches: PlayerMatch[] = matches.map((match) => {
+  // Process matches to extract player-specific data — skip any match where the
+  // player's participant data is missing (e.g. remakes, data gaps).
+  const playerMatches: PlayerMatch[] = matches.flatMap((match) => {
     const playerData = match.info.participants.find(
       (participant) => participant.puuid === account.puuid
     );
 
     if (!playerData) {
-      throw new Error("Player not found in match data");
+      return []; // skip this match silently
     }
 
     // Get teammates (same team, excluding the player)

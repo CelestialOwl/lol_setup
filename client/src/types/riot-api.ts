@@ -111,6 +111,19 @@ export interface SummonerData {
   matches: Match[];
 }
 
+// Returned by GET /api/summoner (profile only — no matches)
+export interface SummonerProfile {
+  account: Account;
+  summoner: Summoner;
+}
+
+// Returned by GET /api/summoner/:puuid/matches
+export interface MatchHistoryData {
+  puuid: string;
+  matches: Match[];
+  total: number;
+}
+
 export interface PlayerMatch {
   matchId: string;
   champion: string;

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"time"
 
 	"lol-match-tracker/internal/models"
@@ -27,7 +28,7 @@ func NewRiotAPIService(apiKey string) *RiotAPIService {
 // GetAccountByRiotID fetches account information by Riot ID
 func (r *RiotAPIService) GetAccountByRiotID(gameName, tagLine, region string) (*models.AccountInfo, error) {
 	url := fmt.Sprintf("https://%s.api.riotgames.com/riot/account/v1/accounts/by-riot-id/%s/%s",
-		r.getRegionCluster(region), gameName, tagLine)
+		r.getRegionCluster(region), url.PathEscape(gameName), url.PathEscape(tagLine))
 
 	var account models.AccountInfo
 	err := r.makeRequest(url, &account)
@@ -119,7 +120,6 @@ func (r *RiotAPIService) makeRequest(url string, dest interface{}) error {
 		return err
 	}
 
-	fmt.Println("Making request to Riot API:", url, r.apiKey) // Debug log for request URL
 	req.Header.Set("X-Riot-Token", r.apiKey)
 	req.Header.Set("Content-Type", "application/json")
 

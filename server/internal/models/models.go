@@ -72,12 +72,26 @@ type Participant struct {
 	CreatedAt    time.Time `json:"createdAt" db:"created_at"`
 }
 
-// SummonerResponse represents the API response for summoner data
+// SummonerResponse represents the legacy combined API response (kept for compatibility).
 type SummonerResponse struct {
 	Account  AccountInfo   `json:"account"`
 	Summoner SummonerInfo  `json:"summoner"`
 	Matches  []MatchData   `json:"matches"`
 	LiveGame *LiveGameInfo `json:"liveGame,omitempty"`
+}
+
+// SummonerProfileResponse is returned by GET /api/summoner.
+// Contains only account + summoner info — no match data.
+type SummonerProfileResponse struct {
+	Account  AccountInfo  `json:"account"`
+	Summoner SummonerInfo `json:"summoner"`
+}
+
+// MatchHistoryResponse is returned by GET /api/summoner/:puuid/matches.
+type MatchHistoryResponse struct {
+	PUUID   string      `json:"puuid"`
+	Matches []MatchData `json:"matches"`
+	Total   int         `json:"total"`
 }
 
 // AccountInfo represents Riot account information
