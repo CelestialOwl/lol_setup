@@ -1,0 +1,20 @@
+meta {
+  name: Get Champion Rotations
+  type: http
+  seq: 1
+}
+
+get {
+  url: https://europe.api.riotgames.com/lol/platform/v3/champion-rotations
+  body: none
+  auth: inherit
+}
+
+params:query {
+  api_key: {{api_key}}
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
