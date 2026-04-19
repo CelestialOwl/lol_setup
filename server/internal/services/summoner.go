@@ -196,6 +196,25 @@ func (s *SummonerService) storeMatchData(matchesData []models.MatchData, region 
 				if !ok || puuid == "" {
 					continue
 				}
+
+				// Upsert participant to summoners table to cache them locally.
+				// This avoids redundant API calls if the same player appears in future matches.
+				gameName := getString(part, "riotIdGameName")
+				tagLine := getString(part, "riotIdTagline")
+				if gameName != "" && tagLine != "" {
+					summoner := &models.Summoner{
+						PUUID:         puuid,
+						GameName:      gameName,
+						TagLine:       tagLine,
+						Region:        region,
+						SummonerLevel: int(getFloat64(part, "summonerLevel")),
+						ProfileIconID: int(getFloat64(part, "profileIcon")),
+					}
+					if err := s.summonerRepo.Upsert(summoner); err != nil {
+						slog.Warn("failed to upsert participant summoner", "puuid", puuid, "error", err)
+					}
+				}
+
 				pModels = append(pModels, models.Participant{
 					PUUID:        puuid,
 					ChampionID:   int(getFloat64(part, "championId")),
