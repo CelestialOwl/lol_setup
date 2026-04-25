@@ -4,6 +4,7 @@ Use Redis for distributed rate limiting.
 
 # add circuit breaker
 sony/gobreaker in Go
+https://github.com/sony/gobreaker
 
 # metrics & logging
 - promethous/grafana and opentelemetry
@@ -13,6 +14,9 @@ sony/gobreaker in Go
 - ELK Stack" (Elasticsearch, Logstash, Kibana) or a modern alternative like the Grafana Stack (Loki for logs, Prometheus for metrics, Grafana for dashboards
 Track: request count, latency histograms, cache hit/miss ratio, Riot API error rate
 Teaches you the difference between counters, gauges, and histograms
+https://opentelemetry.io/docs/languages/go/getting-started/
+https://prometheus.io/docs/prometheus/latest/getting_started/
+
 
 # Context propagation
 Context propagation + timeouts everywhere: Right now Redis uses a context.Background() in redis.go. Refactor so handlers pass c.Request.Context() through services/repos/cache, and enforce timeouts (e.g., shorter for Redis, longer for DB, strict for Riot). You’ll learn cancellation, tail latency control, and avoiding goroutine leaks.
@@ -28,7 +32,9 @@ Unit tests for services with mocked repos/Riot client; integration tests with do
 - testify 
 - mockery
 - integration test with postgres/redis
-
+https://golang.testcontainers.org/
+https://github.com/vektra/mockery
+https://github.com/stretchr/testify
 
 # do the perforamnce and load testing
  Add k6/vegeta to simulate traffic; measure p95/p99, cache hit ratio, DB query time, Riot call rate. Then tune: connection pools, query indexes, concurrency limits, batching.
@@ -41,12 +47,10 @@ golangci-lint
 Static analysis aggregator for Go — catches unused parameters, shadow variables, error return values being silently dropped, etc.
 
 
-
 # Later
 ## add authentication
 Implement OAuth2, JWT, or session-based authentication.
 Add user roles (admin, user) and permissions.
-
 
 ## Advanced Database Patterns
 Implement database migrations (you already have some).
@@ -69,7 +73,6 @@ Implement cache invalidation and cache warming.
 Experiment with denormalized tables or materialized views for performance.
 
 ## Distributed tracing — OpenTelemetry
-
 Adds a trace span to every Riot API call; you can see exactly how long each HTTP call to Riot took and where latency comes from
 Works with Jaeger (free, local) or any OTLP backend
 Teaches you how to propagate context through a call chain
