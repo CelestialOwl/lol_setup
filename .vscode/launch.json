@@ -2,7 +2,45 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Go: Launch Server (local)",
+            "name": "Client: Next.js + Chrome",
+            "type": "node",
+            "request": "launch",
+            "program": "${workspaceFolder}/client/node_modules/next/dist/bin/next",
+            "args": ["dev"],
+            "cwd": "${workspaceFolder}/client",
+            "console": "integratedTerminal",
+            "restart": true,
+            "env": {
+                "NODE_OPTIONS": "--inspect"
+            },
+            "skipFiles": ["<node_internals>/**"],
+            "resolveSourceMapLocations": [
+                "${workspaceFolder}/client/**",
+                "!**/node_modules/**"
+            ],
+            "serverReadyAction": {
+                "pattern": "- Local:.+(https?://.+)",
+                "uriFormat": "%s",
+                "action": "debugWithChrome"
+            }
+        },
+        {
+            "name": "Client: Chrome (existing Next.js)",
+            "type": "pwa-chrome",
+            "request": "launch",
+            "url": "http://localhost:3000",
+            "webRoot": "${workspaceFolder}/client",
+            "sourceMapPathOverrides": {
+                "webpack://_N_E/./*": "${webRoot}/*",
+                "webpack:///./*": "${webRoot}/*"
+            },
+            "skipFiles": [
+                "${workspaceFolder}/client/node_modules/**/*.js",
+                "<node_internals>/**/*.js"
+            ]
+        },
+        {
+            "name": "Server: Launch locally",
             "type": "go",
             "request": "launch",
             "mode": "debug",
@@ -11,19 +49,34 @@
             "envFile": "${workspaceFolder}/server/.env"
         },
         {
-            "name": "Go: Attach to Docker (remote Delve)",
+            "name": "Server: Attach to Docker (remote Delve)",
             "type": "go",
             "request": "attach",
             "mode": "remote",
             "debugAdapter": "legacy",
+            "dlvLoadConfig": {
+                "maxStringLen": 1000
+            },
+            "host": "127.0.0.1",
+            "port": 2345,
+            "preLaunchTask": "Server: Docker Debug Up",
+            "postDebugTask": "Server: Docker Debug Down",
             "substitutePath": [
                 {
                     "from": "${workspaceFolder}/server",
                     "to": "/app"
                 }
+            ]
+        }
+    ],
+    "compounds": [
+        {
+            "name": "App: Client local + server Docker debug",
+            "configurations": [
+                "Client: Next.js + Chrome",
+                "Server: Attach to Docker (remote Delve)"
             ],
-            "port": 2345,
-            "host": "127.0.0.1"
+            "stopAll": true
         }
     ]
 }

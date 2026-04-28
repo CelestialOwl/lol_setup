@@ -4,6 +4,7 @@
 # Quick reference:
 #   make dev-local   → DB in Docker + Go server locally (fastest iteration)
 #   make dev-docker  → Everything in Docker (tests the full stack)
+#   make debug-docker-up   → Start Delve in Docker for VS Code attach
 #   make migrate-up  → Apply all pending migrations (requires migrate CLI)
 #   make test        → Run all Go tests
 # ──────────────────────────────────────────────────────────────────────────────
@@ -18,6 +19,7 @@ BINARY  = lol-match-tracker
 # Docker
 DOCKER_IMAGE = lol-match-tracker-api
 DOCKER_TAG   = latest
+DEBUG_COMPOSE_FILES = -f docker-compose.yml -f docker-compose.debug.yml
 
 # golang-migrate
 # Local dev DB URL — override with DB_URL=... if your creds differ
@@ -58,6 +60,12 @@ dev-local: db-up migrate-up
 #   - Slower iteration because Docker must rebuild the image on Go changes.
 dev-docker:
 	docker compose up --build
+
+debug-docker-up:
+	docker compose $(DEBUG_COMPOSE_FILES) up --build -d
+
+debug-docker-down:
+	docker compose $(DEBUG_COMPOSE_FILES) down
 
 install-air:
 	go install github.com/cosmtrek/air@latest
@@ -114,7 +122,7 @@ build-linux:
 	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 $(GOBUILD) -o $(BINARY)_unix -v ./cmd/server
 
 .PHONY: all build test clean deps fmt vet \
-        dev-local dev-docker install-air \
+	dev-local dev-docker debug-docker-up debug-docker-down install-air \
         docker-build docker-stop docker-clean \
         db-up db-down \
         migrate-install migrate-up migrate-down migrate-status migrate-drop \
