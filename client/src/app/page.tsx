@@ -13,6 +13,7 @@ export default function HomePage() {
   const [loading, setLoading] = useState(false);
   // loadingStep drives the spinner message so users see what's happening
   const [loadingStep, setLoadingStep] = useState<"profile" | "matches">("profile");
+  const [currentRegion, setCurrentRegion] = useState<string>("na1");
   const [error, setError] = useState<string | null>(null);
   const [summonerData, setSummonerData] = useState<SummonerData | null>(null);
   const [liveGameData, setLiveGameData] = useState<LiveGameData | null>(null);
@@ -30,6 +31,7 @@ export default function HomePage() {
     setError(null);
     setSummonerData(null);
     setLiveGameData(null);
+    setCurrentRegion(searchData.region);
     setLastSearchedPlayer(`${searchData.gameName}#${searchData.tagLine}`);
 
     try {
@@ -145,7 +147,7 @@ export default function HomePage() {
         {error && <ErrorDisplay error={error} onRetry={handleRetry} />}
 
         {viewMode === "match-history" && summonerData && !loading && !error && (
-          <MatchHistory summonerData={summonerData} />
+          <MatchHistory summonerData={summonerData} region={currentRegion} />
         )}
 
         {viewMode === "live-game" && !loading && !error && (

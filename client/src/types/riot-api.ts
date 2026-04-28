@@ -43,12 +43,15 @@ export interface Participant {
   puuid: string;
   championId: number;
   championName: string;
+  neutralMinionsKilled?: number;
+  riotIdTagline?: string;
   summonerName: string;
   teamId: number;
   kills: number;
   deaths: number;
   assists: number;
   totalDamageDealtToChampions: number;
+  totalMinionsKilled?: number;
   riotIdGameName: string;
   goldEarned: number;
   wardsPlaced: number;
@@ -127,15 +130,21 @@ export interface MatchHistoryData {
 export interface PlayerMatch {
   matchId: string;
   champion: string;
+  championId?: number;
   kills: number;
   deaths: number;
   assists: number;
   damage: number;
+  cs?: number;
+  csPerMinute?: number;
+  enemies?: TeammateInfo[];
   gold: number;
   win: boolean;
   gameMode: string;
   gameDuration: number;
   gameDate: Date;
+  itemIds?: number[];
+  spellIds?: [number, number];
   teammates: TeammateInfo[];
 }
 

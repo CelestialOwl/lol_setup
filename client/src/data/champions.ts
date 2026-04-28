@@ -217,3 +217,8 @@ export const getSummonerSpellImageUrl = (
   if (spellKey === "Unknown") return null;
   return `https://ddragon.leagueoflegends.com/cdn/${version}/img/spell/${spellKey}.png`;
 };
+
+export const getItemImageUrl = (itemId: number, version = "14.19.1") => {
+  if (!itemId) return null;
+  return `https://ddragon.leagueoflegends.com/cdn/${version}/img/item/${itemId}.png`;
+};
