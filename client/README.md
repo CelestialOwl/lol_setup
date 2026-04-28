@@ -41,6 +41,42 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the application.
 
+## Frontend Tooling
+
+### Storybook
+
+Run the component workbench locally:
+
+```bash
+npm run storybook
+```
+
+Build the static Storybook bundle:
+
+```bash
+npm run build-storybook
+```
+
+### Unit Tests
+
+Run the frontend unit tests once:
+
+```bash
+npm test
+```
+
+Run Vitest in watch mode during development:
+
+```bash
+npm run test:watch
+```
+
+Generate a coverage report:
+
+```bash
+npm run test:coverage
+```
+
 ## Tech Stack
 
 - **Next.js 15** with App Router
