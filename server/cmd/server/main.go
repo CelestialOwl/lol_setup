@@ -101,10 +101,12 @@ func main() {
 		// Summoner routes
 		summoner := api.Group("/summoner")
 		{
-			summoner.GET("", summonerHandler.GetSummoner)                    // profile only
-			summoner.POST("/search", summonerHandler.SearchSummoner)         // same as GET but via POST body
-			summoner.GET("/:puuid/matches", summonerHandler.GetMatchHistory) // match history
-			summoner.GET("/:puuid/stats", summonerHandler.GetSummonerStats)  // aggregate stats
+			summoner.GET("", summonerHandler.GetSummoner)                        // profile only
+			summoner.POST("/search", summonerHandler.SearchSummoner)             // same as GET but via POST body
+			summoner.GET("/:puuid/matches", summonerHandler.GetMatchHistory)     // match history
+			summoner.GET("/:puuid/stats", summonerHandler.GetSummonerStats)      // aggregate stats
+			summoner.GET("/:puuid/rank", summonerHandler.GetRank)                // latest rank from DB
+			summoner.GET("/:puuid/rank/history", summonerHandler.GetRankHistory) // LP history for charts
 		}
 		// Live game route
 		api.GET("/live-game", liveGameHandler.GetLiveGame)

@@ -134,3 +134,56 @@ func (h *SummonerHandler) SearchSummoner(c *gin.Context) {
 
 	c.JSON(http.StatusOK, response)
 }
+
+// GetRank handles GET /api/summoner/:puuid/rank
+// Returns the latest rank snapshots from DB for any puuid (no live Riot API call).
+func (h *SummonerHandler) GetRank(c *gin.Context) {
+	puuid := c.Param("puuid")
+	if puuid == "" {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{
+			Error: "PUUID is required",
+			Code:  http.StatusBadRequest,
+		})
+		return
+	}
+
+	entries, err := h.summonerService.GetCachedRank(puuid)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse{
+			Error:   "Failed to fetch rank",
+			Message: err.Error(),
+			Code:    http.StatusInternalServerError,
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, entries)
+}
+
+// GetRankHistory handles GET /api/summoner/:puuid/rank/history
+// Query param: queueType (default: RANKED_SOLO_5x5)
+// Returns all historical snapshots ordered oldest-first for charting.
+func (h *SummonerHandler) GetRankHistory(c *gin.Context) {
+	puuid := c.Param("puuid")
+	if puuid == "" {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{
+			Error: "PUUID is required",
+			Code:  http.StatusBadRequest,
+		})
+		return
+	}
+
+	queueType := c.DefaultQuery("queueType", "RANKED_SOLO_5x5")
+
+	snapshots, err := h.summonerService.GetRankHistory(puuid, queueType)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse{
+			Error:   "Failed to fetch rank history",
+			Message: err.Error(),
+			Code:    http.StatusInternalServerError,
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, snapshots)
+}

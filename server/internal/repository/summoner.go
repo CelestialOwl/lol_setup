@@ -5,6 +5,8 @@ import (
 
 	"lol-match-tracker/internal/database"
 	"lol-match-tracker/internal/models"
+
+	"github.com/lib/pq"
 )
 
 type SummonerRepository struct {
@@ -139,4 +141,139 @@ func (r *SummonerRepository) GetStats(puuid string) (*models.MatchStats, error) 
 	}
 
 	return &stats, nil
+}
+
+// SaveRankSnapshots inserts a rank snapshot for each entry if no snapshot
+// already exists within the last hour for that puuid+queue_type pair.
+func (r *SummonerRepository) SaveRankSnapshots(puuid string, entries []models.LeagueEntry) error {
+	checkQuery := `
+		SELECT COUNT(*) FROM rank_snapshots
+		WHERE puuid = $1 AND queue_type = $2
+		  AND recorded_at > NOW() - INTERVAL '1 hour'
+	`
+	insertQuery := `
+		INSERT INTO rank_snapshots
+		    (puuid, queue_type, tier, rank, league_points, wins, losses, hot_streak, veteran, fresh_blood, inactive)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+	`
+
+	for _, e := range entries {
+		var count int
+		if err := r.db.QueryRow(checkQuery, puuid, e.QueueType).Scan(&count); err != nil {
+			return fmt.Errorf("failed to check rank snapshot for queue %s: %w", e.QueueType, err)
+		}
+		if count > 0 {
+			continue // already have a snapshot within the last hour
+		}
+		if _, err := r.db.Exec(insertQuery,
+			puuid, e.QueueType, e.Tier, e.Rank, e.LeaguePoints,
+			e.Wins, e.Losses, e.HotStreak, e.Veteran, e.FreshBlood, e.Inactive,
+		); err != nil {
+			return fmt.Errorf("failed to save rank snapshot for queue %s: %w", e.QueueType, err)
+		}
+	}
+
+	return nil
+}
+
+// GetLatestRankSnapshots returns the latest snapshot per queue_type for a puuid.
+func (r *SummonerRepository) GetLatestRankSnapshots(puuid string) ([]models.LeagueEntry, error) {
+	query := `
+		SELECT DISTINCT ON (queue_type)
+		    queue_type, tier, rank, league_points, wins, losses, hot_streak, veteran, fresh_blood, inactive
+		FROM rank_snapshots
+		WHERE puuid = $1
+		ORDER BY queue_type, recorded_at DESC
+	`
+
+	rows, err := r.db.Query(query, puuid)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var entries []models.LeagueEntry
+	for rows.Next() {
+		var e models.LeagueEntry
+		if err := rows.Scan(
+			&e.QueueType, &e.Tier, &e.Rank, &e.LeaguePoints,
+			&e.Wins, &e.Losses, &e.HotStreak, &e.Veteran, &e.FreshBlood, &e.Inactive,
+		); err != nil {
+			return nil, err
+		}
+		e.PUUID = puuid
+		entries = append(entries, e)
+	}
+
+	return entries, rows.Err()
+}
+
+// GetLatestSoloRankByPUUIDs returns the latest RANKED_SOLO_5x5 snapshot for
+// each of the given PUUIDs. PUUIDs with no snapshot are omitted from the map.
+func (r *SummonerRepository) GetLatestSoloRankByPUUIDs(puuids []string) (map[string]*models.LeagueEntry, error) {
+	if len(puuids) == 0 {
+		return map[string]*models.LeagueEntry{}, nil
+	}
+
+	query := `
+		SELECT DISTINCT ON (puuid)
+		    puuid, queue_type, tier, rank, league_points, wins, losses, hot_streak, veteran, fresh_blood, inactive
+		FROM rank_snapshots
+		WHERE puuid = ANY($1)
+		  AND queue_type = 'RANKED_SOLO_5x5'
+		ORDER BY puuid, recorded_at DESC
+	`
+
+	rows, err := r.db.Query(query, pq.Array(puuids))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	result := make(map[string]*models.LeagueEntry, len(puuids))
+	for rows.Next() {
+		var e models.LeagueEntry
+		if err := rows.Scan(
+			&e.PUUID, &e.QueueType, &e.Tier, &e.Rank, &e.LeaguePoints,
+			&e.Wins, &e.Losses, &e.HotStreak, &e.Veteran, &e.FreshBlood, &e.Inactive,
+		); err != nil {
+			return nil, err
+		}
+		entry := e
+		result[e.PUUID] = &entry
+	}
+
+	return result, rows.Err()
+}
+
+// GetRankHistory returns all snapshots for a puuid+queue_type ordered oldest-first
+// (suitable for LP-over-time charts).
+func (r *SummonerRepository) GetRankHistory(puuid, queueType string) ([]models.RankSnapshot, error) {
+	query := `
+		SELECT id, puuid, queue_type, tier, rank, league_points, wins, losses,
+		       hot_streak, veteran, fresh_blood, inactive, recorded_at
+		FROM rank_snapshots
+		WHERE puuid = $1 AND queue_type = $2
+		ORDER BY recorded_at ASC
+	`
+
+	rows, err := r.db.Query(query, puuid, queueType)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var snapshots []models.RankSnapshot
+	for rows.Next() {
+		var s models.RankSnapshot
+		if err := rows.Scan(
+			&s.ID, &s.PUUID, &s.QueueType, &s.Tier, &s.Rank, &s.LeaguePoints,
+			&s.Wins, &s.Losses, &s.HotStreak, &s.Veteran, &s.FreshBlood, &s.Inactive, &s.RecordedAt,
+		); err != nil {
+			return nil, err
+		}
+		snapshots = append(snapshots, s)
+	}
+
+	return snapshots, rows.Err()
 }

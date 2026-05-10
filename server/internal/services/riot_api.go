@@ -113,6 +113,20 @@ func (r *RiotAPIService) GetCurrentGameByPUUID(puuid, region string) (map[string
 	return gameData, nil
 }
 
+// GetLeagueEntriesByPUUID fetches ranked queue entries for a summoner by PUUID.
+// Uses the platform endpoint (e.g. na1.api.riotgames.com), not the regional cluster.
+func (r *RiotAPIService) GetLeagueEntriesByPUUID(puuid, region string) ([]models.LeagueEntry, error) {
+	apiURL := fmt.Sprintf("https://%s.api.riotgames.com/lol/league/v4/entries/by-puuid/%s",
+		region, url.PathEscape(puuid))
+
+	var entries []models.LeagueEntry
+	if err := r.makeRequest(apiURL, &entries); err != nil {
+		return nil, fmt.Errorf("failed to get league entries: %w", err)
+	}
+
+	return entries, nil
+}
+
 // makeRequest makes an HTTP request to the Riot API
 func (r *RiotAPIService) makeRequest(url string, dest interface{}) error {
 	req, err := http.NewRequest("GET", url, nil)

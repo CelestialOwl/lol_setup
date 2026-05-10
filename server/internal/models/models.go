@@ -81,17 +81,54 @@ type SummonerResponse struct {
 }
 
 // SummonerProfileResponse is returned by GET /api/summoner.
-// Contains only account + summoner info — no match data.
+// Contains account + summoner info, plus the freshly-fetched rank for the searched player.
 type SummonerProfileResponse struct {
-	Account  AccountInfo  `json:"account"`
-	Summoner SummonerInfo `json:"summoner"`
+	Account  AccountInfo   `json:"account"`
+	Summoner SummonerInfo  `json:"summoner"`
+	Rank     []LeagueEntry `json:"rank,omitempty"`
 }
 
 // MatchHistoryResponse is returned by GET /api/summoner/:puuid/matches.
+// Ranks is a map of puuid → latest RANKED_SOLO_5x5 snapshot from DB for every
+// participant that has one; omitted/null means no historical data available.
 type MatchHistoryResponse struct {
-	PUUID   string      `json:"puuid"`
-	Matches []MatchData `json:"matches"`
-	Total   int         `json:"total"`
+	PUUID   string                  `json:"puuid"`
+	Matches []MatchData             `json:"matches"`
+	Total   int                     `json:"total"`
+	Ranks   map[string]*LeagueEntry `json:"ranks,omitempty"`
+}
+
+// LeagueEntry represents a single ranked queue entry from the Riot league API.
+type LeagueEntry struct {
+	LeagueID     string `json:"leagueId"`
+	QueueType    string `json:"queueType"`
+	Tier         string `json:"tier"`
+	Rank         string `json:"rank"`
+	PUUID        string `json:"puuid,omitempty"`
+	LeaguePoints int    `json:"leaguePoints"`
+	Wins         int    `json:"wins"`
+	Losses       int    `json:"losses"`
+	Veteran      bool   `json:"veteran"`
+	Inactive     bool   `json:"inactive"`
+	FreshBlood   bool   `json:"freshBlood"`
+	HotStreak    bool   `json:"hotStreak"`
+}
+
+// RankSnapshot represents one row in the rank_snapshots table.
+type RankSnapshot struct {
+	ID           int       `json:"id" db:"id"`
+	PUUID        string    `json:"puuid" db:"puuid"`
+	QueueType    string    `json:"queueType" db:"queue_type"`
+	Tier         string    `json:"tier" db:"tier"`
+	Rank         string    `json:"rank" db:"rank"`
+	LeaguePoints int       `json:"leaguePoints" db:"league_points"`
+	Wins         int       `json:"wins" db:"wins"`
+	Losses       int       `json:"losses" db:"losses"`
+	HotStreak    bool      `json:"hotStreak" db:"hot_streak"`
+	Veteran      bool      `json:"veteran" db:"veteran"`
+	FreshBlood   bool      `json:"freshBlood" db:"fresh_blood"`
+	Inactive     bool      `json:"inactive" db:"inactive"`
+	RecordedAt   time.Time `json:"recordedAt" db:"recorded_at"`
 }
 
 // AccountInfo represents Riot account information

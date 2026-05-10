@@ -37,6 +37,7 @@ func NewSummonerService(
 
 // GetSummonerProfile fetches account + summoner info only (no matches).
 // It checks Redis → Postgres → Riot API and is a fast 2-call path.
+// On every live fetch it also retrieves and stores the player's rank.
 func (s *SummonerService) GetSummonerProfile(gameName, tagLine, region string) (*models.SummonerProfileResponse, error) {
 	cacheKey := fmt.Sprintf("profile:%s:%s:%s", region, gameName, tagLine)
 
@@ -68,6 +69,10 @@ func (s *SummonerService) GetSummonerProfile(gameName, tagLine, region string) (
 			},
 			Summoner: *summonerInfo,
 		}
+		// Attach rank from DB (no live fetch on cache hit)
+		if rankEntries, e := s.summonerRepo.GetLatestRankSnapshots(dbSummoner.PUUID); e == nil {
+			resp.Rank = rankEntries
+		}
 		s.cache.Set(cacheKey, resp, time.Duration(s.config.SummonerCacheTTL)*time.Second) //nolint:errcheck
 		return resp, nil
 	}
@@ -95,7 +100,13 @@ func (s *SummonerService) GetSummonerProfile(gameName, tagLine, region string) (
 		slog.Warn("failed to upsert summoner", "error", err)
 	}
 
-	resp := &models.SummonerProfileResponse{Account: *account, Summoner: *summonerInfo}
+	// Fetch and store rank for the searched player
+	rankEntries, rankErr := s.FetchAndStoreRank(account.PUUID, region)
+	if rankErr != nil {
+		slog.Warn("failed to fetch/store rank", "puuid", account.PUUID, "region", region, "error", rankErr)
+	}
+
+	resp := &models.SummonerProfileResponse{Account: *account, Summoner: *summonerInfo, Rank: rankEntries}
 	s.cache.Set(cacheKey, resp, time.Duration(s.config.SummonerCacheTTL)*time.Second) //nolint:errcheck
 	return resp, nil
 }
@@ -103,6 +114,8 @@ func (s *SummonerService) GetSummonerProfile(gameName, tagLine, region string) (
 // GetMatchHistory fetches the last 10 matches for a PUUID.
 // This is kept separate from GetSummonerProfile so the UI can display the
 // summoner card immediately while match data loads in a follow-up request.
+// The response includes a Ranks map with the latest solo rank from DB for every
+// participant that has one — no live Riot API call is made for other players.
 func (s *SummonerService) GetMatchHistory(puuid, region string) (*models.MatchHistoryResponse, error) {
 	cacheKey := fmt.Sprintf("matches:%s:%s", region, puuid)
 
@@ -121,7 +134,8 @@ func (s *SummonerService) GetMatchHistory(puuid, region string) (*models.MatchHi
 		for _, m := range dbMatches {
 			matchData = append(matchData, m.MatchData)
 		}
-		resp := &models.MatchHistoryResponse{PUUID: puuid, Matches: matchData, Total: len(matchData)}
+		ranks := s.collectParticipantRanks(matchData)
+		resp := &models.MatchHistoryResponse{PUUID: puuid, Matches: matchData, Total: len(matchData), Ranks: ranks}
 		s.cache.Set(cacheKey, resp, time.Duration(s.config.MatchCacheTTL)*time.Second) //nolint:errcheck
 		return resp, nil
 	}
@@ -148,9 +162,51 @@ func (s *SummonerService) GetMatchHistory(puuid, region string) (*models.MatchHi
 		slog.Warn("failed to store match data", "error", err)
 	}
 
-	resp := &models.MatchHistoryResponse{PUUID: puuid, Matches: matches, Total: len(matches)}
+	ranks := s.collectParticipantRanks(matches)
+	resp := &models.MatchHistoryResponse{PUUID: puuid, Matches: matches, Total: len(matches), Ranks: ranks}
 	s.cache.Set(cacheKey, resp, time.Duration(s.config.MatchCacheTTL)*time.Second) //nolint:errcheck
 	return resp, nil
+}
+
+// collectParticipantRanks gathers all unique participant PUUIDs from a set of
+// match data and batch-queries the DB for their latest solo rank. No Riot API
+// calls are made — data is best-effort from previous snapshots.
+func (s *SummonerService) collectParticipantRanks(matches []models.MatchData) map[string]*models.LeagueEntry {
+	seen := make(map[string]struct{})
+	var puuids []string
+
+	for _, md := range matches {
+		info, ok := md["info"].(map[string]interface{})
+		if !ok {
+			continue
+		}
+		participants, ok := info["participants"].([]interface{})
+		if !ok {
+			continue
+		}
+		for _, p := range participants {
+			part, ok := p.(map[string]interface{})
+			if !ok {
+				continue
+			}
+			puuid, _ := part["puuid"].(string)
+			if puuid == "" {
+				continue
+			}
+			if _, dup := seen[puuid]; !dup {
+				seen[puuid] = struct{}{}
+				puuids = append(puuids, puuid)
+			}
+		}
+	}
+
+	ranks, err := s.summonerRepo.GetLatestSoloRankByPUUIDs(puuids)
+	if err != nil {
+		slog.Warn("failed to fetch participant ranks from DB", "error", err)
+		return nil
+	}
+
+	return ranks
 }
 
 // storeMatchData persists match rows and all 10 participants to the database.
@@ -255,6 +311,37 @@ func (s *SummonerService) GetSummonerStats(puuid string) (*models.MatchStats, er
 
 	s.cache.Set(cacheKey, stats, 1*time.Hour) //nolint:errcheck
 	return stats, nil
+}
+
+// FetchAndStoreRank calls the Riot league API for the given player, persists
+// a snapshot (deduplicated by 1-hour window), and returns the live entries.
+// Only call this for the searched player — not for match participants.
+func (s *SummonerService) FetchAndStoreRank(puuid, region string) ([]models.LeagueEntry, error) {
+	entries, err := s.riotAPI.GetLeagueEntriesByPUUID(puuid, region)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch rank from Riot API: %w", err)
+	}
+
+	if err := s.summonerRepo.SaveRankSnapshots(puuid, entries); err != nil {
+		slog.Warn("failed to save rank snapshots", "puuid", puuid, "error", err)
+	}
+
+	return entries, nil
+}
+
+// GetCachedRank returns the latest rank snapshots from DB for any puuid.
+// No Riot API call is made — suitable for non-searched participants.
+func (s *SummonerService) GetCachedRank(puuid string) ([]models.LeagueEntry, error) {
+	return s.summonerRepo.GetLatestRankSnapshots(puuid)
+}
+
+// GetRankHistory returns all stored rank snapshots for a puuid+queueType
+// ordered oldest-first (for LP-over-time charts).
+func (s *SummonerService) GetRankHistory(puuid, queueType string) ([]models.RankSnapshot, error) {
+	if queueType == "" {
+		queueType = "RANKED_SOLO_5x5"
+	}
+	return s.summonerRepo.GetRankHistory(puuid, queueType)
 }
 
 // ── safe map helpers ──────────────────────────────────────────────────────────
