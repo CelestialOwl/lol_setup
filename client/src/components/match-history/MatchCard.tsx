@@ -12,24 +12,18 @@ import InventoryRow from "./InventoryRow";
 import RosterRow from "./RosterRow";
 import {
   ParticipantRankLabelGetter,
-  ParticipantRankStateGetter,
   PlayerMatchCard,
-  RankHoverHandler,
 } from "./types";
 import { formatDuration, formatKDA, formatTimeAgo } from "./utils";
 
 interface MatchCardProps {
   getRankLabel: ParticipantRankLabelGetter;
-  getRankState: ParticipantRankStateGetter;
   match: PlayerMatchCard;
-  onHoverRank: RankHoverHandler;
 }
 
 export default function MatchCard({
   getRankLabel,
-  getRankState,
   match,
-  onHoverRank,
 }: MatchCardProps) {
   const championInfo = getChampionInfo(match.championId);
   const spellOne = getSummonerSpellInfo(match.spellIds[0]);
@@ -38,8 +32,8 @@ export default function MatchCard({
   return (
     <div
       data-testid={`match-card-${match.matchId}`}
-      className={`overflow-hidden rounded-2xl border bg-white shadow-md shadow-slate-200/70 ${
-        match.win ? "border-emerald-100" : "border-rose-100"
+      className={`overflow-hidden rounded-2xl border bg-white dark:bg-slate-900 shadow-md shadow-slate-200/70 dark:shadow-black/30 ${
+        match.win ? "border-emerald-100 dark:border-emerald-900/50" : "border-rose-100 dark:border-rose-900/50"
       }`}
     >
       <div
@@ -47,26 +41,26 @@ export default function MatchCard({
           match.win ? "bg-emerald-500" : "bg-rose-500"
         }`}
       />
-      <div className="grid grid-cols-1 gap-4 p-5 lg:grid-cols-12">
-        <div className="space-y-3 lg:col-span-2">
+      <div className="grid grid-cols-1 gap-3 p-4 lg:grid-cols-12">
+        <div className="space-y-2 lg:col-span-2">
           <span
             className={`inline-flex rounded-full px-3 py-1 text-sm font-semibold ${
               match.win
-                ? "bg-emerald-100 text-emerald-800"
-                : "bg-rose-100 text-rose-800"
+                ? "bg-emerald-100 dark:bg-emerald-900/30 text-emerald-800 dark:text-emerald-300"
+                : "bg-rose-100 dark:bg-rose-900/30 text-rose-800 dark:text-rose-300"
             }`}
           >
             {match.win ? "Victory" : "Defeat"}
           </span>
-          <div className="space-y-1 text-sm text-slate-600">
-            <p className="font-medium text-slate-800">{match.gameMode}</p>
+          <div className="space-y-1 text-sm text-slate-600 dark:text-slate-400">
+            <p className="font-medium text-slate-800 dark:text-slate-100">{match.gameMode}</p>
             <p>{formatDuration(match.gameDuration)}</p>
             <p>{formatTimeAgo(match.gameDate)}</p>
           </div>
         </div>
 
-        <div className="space-y-4 lg:col-span-4">
-          <div className="flex gap-3">
+        <div className="space-y-3 lg:col-span-4">
+          <div className="flex gap-2">
             <IconBox
               src={getChampionImageUrl(championInfo.key)}
               alt={championInfo.name}
@@ -92,12 +86,12 @@ export default function MatchCard({
                 />
               </div>
               <div>
-                <p className="text-lg font-semibold text-slate-800">
+                <p className="text-lg font-semibold text-slate-800 dark:text-slate-100">
                   {match.champion}
                 </p>
-                <p className="text-sm font-medium text-slate-700">
+                <p className="text-sm font-medium text-slate-700 dark:text-slate-300">
                   {match.kills}/{match.deaths}/{match.assists}
-                  <span className="ml-2 text-slate-500">
+                  <span className="ml-2 text-slate-500 dark:text-slate-400">
                     {formatKDA(match.kills, match.deaths, match.assists)} KDA
                   </span>
                 </p>
@@ -105,30 +99,30 @@ export default function MatchCard({
             </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-3 rounded-xl bg-slate-50 p-3">
+          <div className="grid grid-cols-3 gap-2 rounded-xl bg-slate-50 dark:bg-slate-800 p-2">
             <div>
-              <p className="text-xs uppercase tracking-wide text-slate-500">
+              <p className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
                 Damage
               </p>
-              <p className="text-sm font-semibold text-slate-800">
+              <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">
                 {match.damage.toLocaleString()}
               </p>
             </div>
             <div>
-              <p className="text-xs uppercase tracking-wide text-slate-500">
+              <p className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
                 Gold
               </p>
-              <p className="text-sm font-semibold text-slate-800">
+              <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">
                 {match.gold.toLocaleString()}
               </p>
             </div>
             <div>
-              <p className="text-xs uppercase tracking-wide text-slate-500">
+              <p className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
                 CS
               </p>
-              <p className="text-sm font-semibold text-slate-800">
+              <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">
                 {match.cs}{" "}
-                <span className="text-slate-500">
+                <span className="text-slate-500 dark:text-slate-400">
                   ({match.csPerMinute.toFixed(1)}/m)
                 </span>
               </p>
@@ -140,10 +134,9 @@ export default function MatchCard({
 
         <div className="space-y-2 lg:col-span-3">
           <div className="flex items-center justify-between">
-            <h4 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
+            <h4 className="text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
               Allies
             </h4>
-            <span className="text-xs text-slate-400">Hover for rank</span>
           </div>
           <div className="space-y-2">
             {match.allies.map((participant) => (
@@ -151,8 +144,6 @@ export default function MatchCard({
                 key={`${match.matchId}-${participant.puuid}`}
                 participant={participant}
                 rankLabel={getRankLabel(participant)}
-                rankState={getRankState(participant)}
-                onHoverRank={onHoverRank}
               />
             ))}
           </div>
@@ -163,7 +154,6 @@ export default function MatchCard({
             <h4 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
               Enemies
             </h4>
-            <span className="text-xs text-slate-400">Hover for rank</span>
           </div>
           <div className="space-y-2">
             {match.enemies.map((participant) => (
@@ -171,8 +161,6 @@ export default function MatchCard({
                 key={`${match.matchId}-${participant.puuid}`}
                 participant={participant}
                 rankLabel={getRankLabel(participant)}
-                rankState={getRankState(participant)}
-                onHoverRank={onHoverRank}
               />
             ))}
           </div>

@@ -71,6 +71,7 @@ export default function HomePage() {
             (m: { metadata: { matchId: string } }) => m.metadata.matchId
           ),
           matches: matchesJson.matches ?? [],
+          ranks:   matchesJson.ranks ?? {},
         });
       } else {
         // ── Live game ──────────────────────────────────────────────────────
@@ -112,19 +113,19 @@ export default function HomePage() {
       : "Loading match history...";
 
   return (
-    <main className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 py-8">
+    <main className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-slate-950 dark:to-slate-900 py-8">
       <div className="container mx-auto px-4">
         <SearchComponent onSearch={handleSearch} loading={loading} />
 
         {/* View Mode Toggle */}
         <div className="w-full max-w-2xl mx-auto mt-4 mb-6">
-          <div className="bg-white rounded-lg shadow-md p-1 flex">
+          <div className="bg-white dark:bg-slate-900 rounded-lg shadow-md dark:shadow-black/30 p-1 flex">
             <button
               onClick={() => handleViewModeChange("match-history")}
               className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
                 viewMode === "match-history"
                   ? "bg-blue-600 text-white"
-                  : "text-gray-600 hover:text-gray-800 hover:bg-gray-100"
+                  : "text-gray-600 dark:text-slate-400 hover:text-gray-800 dark:hover:text-slate-100 hover:bg-gray-100 dark:hover:bg-slate-800"
               }`}
             >
               📊 Match History
@@ -134,7 +135,7 @@ export default function HomePage() {
               className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
                 viewMode === "live-game"
                   ? "bg-red-600 text-white"
-                  : "text-gray-600 hover:text-gray-800 hover:bg-gray-100"
+                  : "text-gray-600 dark:text-slate-400 hover:text-gray-800 dark:hover:text-slate-100 hover:bg-gray-100 dark:hover:bg-slate-800"
               }`}
             >
               🔴 Live Game

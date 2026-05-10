@@ -17,11 +17,10 @@ export interface Summoner {
 
 export interface LeagueEntry {
   leagueId: string;
-  summonerId: string;
-  summonerName: string;
   queueType: string;
   tier: string;
   rank: string;
+  puuid?: string;
   leaguePoints: number;
   wins: number;
   losses: number;
@@ -112,12 +111,15 @@ export interface SummonerData {
   summoner: Summoner;
   matchHistory: string[];
   matches: Match[];
+  // puuid → latest RANKED_SOLO_5x5 snapshot for every participant with DB history
+  ranks?: Record<string, LeagueEntry>;
 }
 
 // Returned by GET /api/summoner (profile only — no matches)
 export interface SummonerProfile {
   account: Account;
   summoner: Summoner;
+  rank?: LeagueEntry[];
 }
 
 // Returned by GET /api/summoner/:puuid/matches
@@ -125,6 +127,7 @@ export interface MatchHistoryData {
   puuid: string;
   matches: Match[];
   total: number;
+  ranks?: Record<string, LeagueEntry>;
 }
 
 export interface PlayerMatch {

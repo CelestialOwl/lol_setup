@@ -48,3 +48,13 @@ body {
   border-left: 4px solid #ef4444;
   background: linear-gradient(to right, #fef2f2, #ffffff);
 }
+
+@media (prefers-color-scheme: dark) {
+  .victory-border {
+    background: linear-gradient(to right, #052e16, #0a0a0a);
+  }
+
+  .defeat-border {
+    background: linear-gradient(to right, #2d0a0a, #0a0a0a);
+  }
+}

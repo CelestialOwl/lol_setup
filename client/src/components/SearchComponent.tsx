@@ -38,15 +38,15 @@ export default function SearchComponent({ onSearch, loading }: SearchComponentPr
   ];
 
   return (
-    <div className="w-full max-w-2xl mx-auto p-6 bg-white rounded-lg shadow-lg">
-      <h1 className="text-3xl font-bold text-center mb-6 text-gray-800">
+    <div className="w-full max-w-2xl mx-auto p-6 bg-white dark:bg-slate-900 rounded-lg shadow-lg dark:shadow-black/30">
+      <h1 className="text-3xl font-bold text-center mb-6 text-gray-800 dark:text-slate-100">
         League of Legends Match History
       </h1>
       
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label htmlFor="gameName" className="block text-sm font-medium text-gray-700 mb-2">
+            <label htmlFor="gameName" className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2">
               Summoner Name
             </label>
             <input
@@ -55,13 +55,13 @@ export default function SearchComponent({ onSearch, loading }: SearchComponentPr
               value={formData.gameName}
               onChange={(e) => setFormData({ ...formData, gameName: e.target.value })}
               placeholder="e.g., Hide on bush"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-800 text-gray-900 dark:text-slate-100 placeholder-gray-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               disabled={loading}
             />
           </div>
           
           <div>
-            <label htmlFor="tagLine" className="block text-sm font-medium text-gray-700 mb-2">
+            <label htmlFor="tagLine" className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2">
               Tag Line
             </label>
             <input
@@ -70,21 +70,21 @@ export default function SearchComponent({ onSearch, loading }: SearchComponentPr
               value={formData.tagLine}
               onChange={(e) => setFormData({ ...formData, tagLine: e.target.value })}
               placeholder="e.g., KR1"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-800 text-gray-900 dark:text-slate-100 placeholder-gray-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               disabled={loading}
             />
           </div>
         </div>
 
         <div>
-          <label htmlFor="region" className="block text-sm font-medium text-gray-700 mb-2">
+            <label htmlFor="region" className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2">
             Region
           </label>
           <select
             id="region"
             value={formData.region}
             onChange={(e) => setFormData({ ...formData, region: e.target.value })}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-800 text-gray-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             disabled={loading}
           >
             {regions.map((region) => (
@@ -111,7 +111,7 @@ export default function SearchComponent({ onSearch, loading }: SearchComponentPr
         </button>
       </form>
 
-      <div className="mt-4 text-sm text-gray-600 text-center">
+      <div className="mt-4 text-sm text-gray-600 dark:text-slate-400 text-center">
         <p>Enter your summoner name and tag (e.g., &quot;Hide on bush&quot; and &quot;KR1&quot;)</p>
         <p>Make sure to select the correct region for accurate results</p>
       </div>

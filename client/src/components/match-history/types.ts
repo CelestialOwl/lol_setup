@@ -36,17 +36,6 @@ export interface PlayerMatchCard {
   win: boolean;
 }
 
-export interface RankLookupState {
-  data?: TeammateInfo;
-  status: "error" | "loaded" | "loading";
-}
-
-export type RankHoverHandler = (participant: TeamRosterEntry) => void | Promise<void>;
-
 export type ParticipantRankLabelGetter = (participant: TeamRosterEntry) => string;
-
-export type ParticipantRankStateGetter = (
-  participant: TeamRosterEntry
-) => RankLookupState | undefined;
 
 export type RosterEntryFactory = (participant: Participant, playerPuuid: string) => TeamRosterEntry;

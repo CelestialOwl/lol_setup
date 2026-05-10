@@ -3,20 +3,16 @@
 import React from "react";
 import { getChampionImageUrl, getChampionInfo } from "@/data/champions";
 import IconBox from "./IconBox";
-import { RankHoverHandler, RankLookupState, TeamRosterEntry } from "./types";
+import { TeamRosterEntry } from "./types";
 
 interface RosterRowProps {
-  onHoverRank: RankHoverHandler;
   participant: TeamRosterEntry;
   rankLabel: string;
-  rankState?: RankLookupState;
 }
 
 export default function RosterRow({
-  onHoverRank,
   participant,
   rankLabel,
-  rankState,
 }: RosterRowProps) {
   const championInfo = getChampionInfo(participant.championId);
 
@@ -24,8 +20,8 @@ export default function RosterRow({
     <div
       className={`rounded-xl border px-2 py-2 ${
         participant.isPlayer
-          ? "border-blue-200 bg-blue-50/80"
-          : "border-slate-200 bg-slate-50/80"
+          ? "border-blue-200 dark:border-blue-800 bg-blue-50/80 dark:bg-blue-900/20"
+          : "border-slate-200 dark:border-slate-700 bg-slate-50/80 dark:bg-slate-800/50"
       }`}
     >
       <div className="flex items-center gap-2">
@@ -37,27 +33,19 @@ export default function RosterRow({
           title={championInfo.name}
         />
         <div className="min-w-0 flex-1">
-          <button
-            type="button"
-            className="group/tooltip relative max-w-full text-left"
-            onMouseEnter={() => onHoverRank(participant)}
-            onFocus={() => onHoverRank(participant)}
-          >
-            <span className="inline-flex max-w-full items-center gap-1">
-              <span className="truncate text-sm font-medium text-slate-800">
-                {participant.gameName}
+          <div className="flex items-center gap-1">
+            <span className="truncate text-sm font-medium text-slate-800 dark:text-slate-100">
+              {participant.gameName}
+            </span>
+            {participant.isPlayer ? (
+              <span className="rounded-full bg-blue-100 dark:bg-blue-900/40 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-blue-700 dark:text-blue-300">
+                You
               </span>
-              {participant.isPlayer ? (
-                <span className="rounded-full bg-blue-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-blue-700">
-                  You
-                </span>
-              ) : null}
-            </span>
-            <span className="pointer-events-none absolute left-0 top-full z-20 mt-1 hidden whitespace-nowrap rounded-md bg-slate-950 px-2 py-1 text-xs font-medium text-white shadow-lg group-hover/tooltip:block group-focus/tooltip:block">
-              {rankState?.status === "loading" ? "Loading rank..." : rankLabel}
-            </span>
-          </button>
-          <p className="truncate text-xs text-slate-500">{championInfo.name}</p>
+            ) : null}
+          </div>
+          <p className="truncate text-xs text-slate-500 dark:text-slate-400">
+            {rankLabel}
+          </p>
         </div>
       </div>
     </div>

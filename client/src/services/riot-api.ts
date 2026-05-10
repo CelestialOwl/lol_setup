@@ -2,12 +2,10 @@ import {
   Account,
   ApiError,
   CurrentGameInfo,
-  LeagueEntry,
   LiveGameData,
   Match,
   Summoner,
   SummonerData,
-  TeammateInfo,
 } from "@/types/riot-api";
 
 const RIOT_API_KEY = process.env.RIOT_API_KEY;
@@ -152,49 +150,6 @@ class RiotApiService {
     return this.makeRequest<Match>(url);
   }
 
-  async getLeagueEntriesByPuuid(
-    puuid: string,
-    region: string
-  ): Promise<LeagueEntry[]> {
-    const endpoints = REGIONAL_ENDPOINTS[region as Region];
-    if (!endpoints) {
-      throw new Error(`Unsupported region: ${region}`);
-    }
-
-    const url = `https://${endpoints.platform}/lol/league/v4/entries/by-puuid/${puuid}`;
-    return this.makeRequest<LeagueEntry[]>(url);
-  }
-
-  async getTeammateInfoWithRank(
-    puuid: string,
-    gameName: string,
-    region: string
-  ): Promise<TeammateInfo> {
-    try {
-      // Get league entries directly by PUUID (no need for summoner data now)
-      const leagueEntries = await this.getLeagueEntriesByPuuid(puuid, region);
-
-      // Find ranked solo/duo entry (most common ranked queue)
-      const rankedSoloEntry = leagueEntries.find(
-        (entry: LeagueEntry) => entry.queueType === "RANKED_SOLO_5x5"
-      );
-
-      return {
-        puuid,
-        gameName,
-        tier: rankedSoloEntry?.tier,
-        rank: rankedSoloEntry?.rank,
-        leaguePoints: rankedSoloEntry?.leaguePoints,
-      };
-    } catch {
-      // If we can't get rank info, return basic info
-      return {
-        puuid,
-        gameName,
-      };
-    }
-  }
-
   async getSummonerData(
     gameName: string,
     tagLine: string,
@@ -221,72 +176,11 @@ class RiotApiService {
 
       const matches = await Promise.all(matchDetailsPromises);
 
-      // Process matches to include teammate rank information
-      const processedMatches = await Promise.all(
-        matches.map(async (match) => {
-          const playerData = match.info.participants.find(
-            (p) => p.puuid === account.puuid
-          );
-          if (!playerData) return match;
-
-          // Get teammates with rank info
-          const teammateParticipants = match.info.participants.filter(
-            (p) => p.teamId === playerData.teamId && p.puuid !== account.puuid
-          );
-
-          // Fetch rank info for teammates (with error handling)
-          const teammatesWithRank = await Promise.allSettled(
-            teammateParticipants.map((teammate) =>
-              this.getTeammateInfoWithRank(
-                teammate.puuid,
-                teammate.riotIdGameName,
-                region
-              )
-            )
-          );
-
-          // Add teammate rank info to match data
-          const enrichedParticipants = match.info.participants.map(
-            (participant) => {
-              if (
-                participant.teamId === playerData.teamId &&
-                participant.puuid !== account.puuid
-              ) {
-                const teammateRankResult = teammatesWithRank.find(
-                  (result, index) =>
-                    result.status === "fulfilled" &&
-                    teammateParticipants[index].puuid === participant.puuid
-                );
-
-                if (
-                  teammateRankResult &&
-                  teammateRankResult.status === "fulfilled"
-                ) {
-                  return {
-                    ...participant,
-                    teammateRankInfo: teammateRankResult.value,
-                  };
-                }
-              }
-              return participant;
-            }
-          );
-
-          return {
-            ...match,
-            info: {
-              ...match.info,
-              participants: enrichedParticipants,
-            },
-          };
-        })
-      );
-
       return {
         account,
         summoner,
         matchHistory,
-        matches: processedMatches,
+        matches,
       };
     } catch (error) {
       if (

@@ -1,15 +1,29 @@
-import { Participant, SummonerData, TeammateInfo } from "@/types/riot-api";
+import { LeagueEntry, Participant, SummonerData, TeammateInfo } from "@/types/riot-api";
 import { PlayerMatchCard, TeamRosterEntry } from "./types";
+
+function leagueEntryToTeammateInfo(entry: LeagueEntry, puuid: string): TeammateInfo {
+  return {
+    puuid,
+    gameName: "",
+    tier: entry.tier,
+    rank: entry.rank,
+    leaguePoints: entry.leaguePoints,
+  };
+}
 
 function toRosterEntry(
   participant: Participant,
-  playerPuuid: string
+  playerPuuid: string,
+  ranksMap?: Record<string, LeagueEntry>
 ): TeamRosterEntry {
+  const rankEntry = ranksMap?.[participant.puuid];
   return {
     championId: participant.championId,
     championName: participant.championName,
     gameName: participant.riotIdGameName || participant.summonerName,
-    initialRank: participant.teammateRankInfo,
+    initialRank: rankEntry
+      ? leagueEntryToTeammateInfo(rankEntry, participant.puuid)
+      : participant.teammateRankInfo,
     isPlayer: participant.puuid === playerPuuid,
     puuid: participant.puuid,
     tagLine: participant.riotIdTagline,
@@ -17,7 +31,7 @@ function toRosterEntry(
 }
 
 export function buildPlayerMatches(summonerData: SummonerData): PlayerMatchCard[] {
-  const { account, matches } = summonerData;
+  const { account, matches, ranks } = summonerData;
 
   return matches.flatMap((match) => {
     const participants = match.info.participants;
@@ -31,12 +45,12 @@ export function buildPlayerMatches(summonerData: SummonerData): PlayerMatchCard[
 
     const allies = participants
       .filter((participant) => participant.teamId === playerData.teamId)
-      .map((participant) => toRosterEntry(participant, account.puuid))
+      .map((participant) => toRosterEntry(participant, account.puuid, ranks))
       .sort((left, right) => Number(right.isPlayer) - Number(left.isPlayer));
 
     const enemies = participants
       .filter((participant) => participant.teamId !== playerData.teamId)
-      .map((participant) => toRosterEntry(participant, account.puuid));
+      .map((participant) => toRosterEntry(participant, account.puuid, ranks));
 
     const cs =
       (playerData.totalMinionsKilled ?? 0) +

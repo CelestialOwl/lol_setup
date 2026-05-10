@@ -43,7 +43,7 @@ export default function LiveGame({ liveGameData }: LiveGameProps) {
     isPlayerTeam: boolean
   ) => (
     <div
-      className={`bg-white rounded-lg shadow-md p-4 ${
+      className={`bg-white dark:bg-slate-900 rounded-lg shadow-md p-4 ${
         isPlayerTeam
           ? "border-l-4 border-blue-500"
           : "border-l-4 border-red-500"
@@ -51,7 +51,7 @@ export default function LiveGame({ liveGameData }: LiveGameProps) {
     >
       <h3
         className={`text-lg font-semibold mb-4 ${
-          isPlayerTeam ? "text-blue-700" : "text-red-700"
+          isPlayerTeam ? "text-blue-700 dark:text-blue-400" : "text-red-700 dark:text-red-400"
         }`}
       >
         {teamName}
@@ -67,8 +67,8 @@ export default function LiveGame({ liveGameData }: LiveGameProps) {
               key={index}
               className={`flex items-center space-x-3 p-2 rounded ${
                 participant.puuid === searchedPlayer.puuid
-                  ? "bg-yellow-100 border border-yellow-300"
-                  : "hover:bg-gray-50"
+                  ? "bg-yellow-100 dark:bg-yellow-900/30 border border-yellow-300 dark:border-yellow-700"
+                  : "hover:bg-gray-50 dark:hover:bg-slate-800"
               }`}
             >
               {/* Champion image and info */}
@@ -88,7 +88,7 @@ export default function LiveGame({ liveGameData }: LiveGameProps) {
                     />
                   ) : null}
                   <div
-                    className={`w-12 h-12 bg-gray-300 rounded flex items-center justify-center text-xs font-bold ${
+                    className={`w-12 h-12 bg-gray-300 dark:bg-slate-700 rounded flex items-center justify-center text-xs font-bold ${
                       getChampionImageUrl(championInfo.key) ? "hidden" : ""
                     }`}
                   >
@@ -96,15 +96,15 @@ export default function LiveGame({ liveGameData }: LiveGameProps) {
                   </div>
                 </div>
                 <div>
-                  <p className="text-xs text-gray-600">{championInfo.name}</p>
+                  <p className="text-xs text-gray-600 dark:text-slate-400">{championInfo.name}</p>
                 </div>
               </div>
 
               <div className="flex-1">
-                <p className="font-medium text-gray-900">
+                <p className="font-medium text-gray-900 dark:text-slate-100">
                   {participant.summonerName}
                   {participant.puuid === searchedPlayer.puuid && (
-                    <span className="ml-2 px-2 py-1 bg-yellow-200 text-yellow-800 text-xs rounded">
+                    <span className="ml-2 px-2 py-1 bg-yellow-200 dark:bg-yellow-900/40 text-yellow-800 dark:text-yellow-300 text-xs rounded">
                       YOU
                     </span>
                   )}
@@ -128,7 +128,7 @@ export default function LiveGame({ liveGameData }: LiveGameProps) {
                     />
                   ) : null}
                   <div
-                    className={`w-6 h-6 bg-gray-200 rounded text-xs flex items-center justify-center ${
+                    className={`w-6 h-6 bg-gray-200 dark:bg-slate-700 rounded text-xs flex items-center justify-center ${
                       getSummonerSpellImageUrl(spell1Info.key) ? "hidden" : ""
                     }`}
                   >
@@ -148,14 +148,14 @@ export default function LiveGame({ liveGameData }: LiveGameProps) {
                     />
                   ) : null}
                   <div
-                    className={`w-6 h-6 bg-gray-200 rounded text-xs flex items-center justify-center ${
+                    className={`w-6 h-6 bg-gray-200 dark:bg-slate-700 rounded text-xs flex items-center justify-center ${
                       getSummonerSpellImageUrl(spell2Info.key) ? "hidden" : ""
                     }`}
                   >
                     {participant.spell2Id}
                   </div>
                 </div>
-                <p className="text-xs text-gray-500 text-center">
+                <p className="text-xs text-gray-500 dark:text-slate-400 text-center">
                   {spell1Info.name.slice(0, 4)} / {spell2Info.name.slice(0, 4)}
                 </p>
               </div>
@@ -170,26 +170,26 @@ export default function LiveGame({ liveGameData }: LiveGameProps) {
   return (
     <div className="w-full max-w-6xl mx-auto p-6">
       {/* Game Info Header */}
-      <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
+      <div className="bg-white dark:bg-slate-900 rounded-lg shadow-lg p-6 mb-6">
         <div className="text-center">
-          <h2 className="text-2xl font-bold text-gray-800 mb-2">
+          <h2 className="text-2xl font-bold text-gray-800 dark:text-slate-100 mb-2">
             🔴 Live Game - {searchedPlayer.summonerName}
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
             <div>
-              <p className="text-sm text-gray-600">Game Mode</p>
+              <p className="text-sm text-gray-600 dark:text-slate-400">Game Mode</p>
               <p className="font-semibold">
                 {getGameMode(gameInfo.gameQueueConfigId)}
               </p>
             </div>
             <div>
-              <p className="text-sm text-gray-600">Game Duration</p>
+              <p className="text-sm text-gray-600 dark:text-slate-400">Game Duration</p>
               <p className="font-semibold">
                 {formatGameDuration(gameInfo.gameLength)}
               </p>
             </div>
             <div>
-              <p className="text-sm text-gray-600">Map ID</p>
+              <p className="text-sm text-gray-600 dark:text-slate-400">Map ID</p>
               <p className="font-semibold">{gameInfo.mapId}</p>
             </div>
           </div>
@@ -212,13 +212,13 @@ export default function LiveGame({ liveGameData }: LiveGameProps) {
 
       {/* Banned Champions */}
       {gameInfo.bannedChampions && gameInfo.bannedChampions.length > 0 && (
-        <div className="bg-white rounded-lg shadow-md p-4">
-          <h3 className="text-lg font-semibold mb-4 text-gray-800">
+        <div className="bg-white dark:bg-slate-900 rounded-lg shadow-md p-4">
+          <h3 className="text-lg font-semibold mb-4 text-gray-800 dark:text-slate-100">
             Banned Champions
           </h3>
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <h4 className="font-medium text-blue-700 mb-2">
+              <h4 className="font-medium text-blue-700 dark:text-blue-400 mb-2">
                 Team {playerTeam[0]?.teamId || "1"} Bans
               </h4>
               <div className="flex flex-wrap gap-2">
@@ -256,7 +256,7 @@ export default function LiveGame({ liveGameData }: LiveGameProps) {
                         >
                           {ban.championId}
                         </div>
-                        <p className="text-xs text-center mt-1 text-blue-700">
+                        <p className="text-xs text-center mt-1 text-blue-700 dark:text-blue-400">
                           {championInfo.name}
                         </p>
                       </div>
@@ -267,12 +267,12 @@ export default function LiveGame({ liveGameData }: LiveGameProps) {
                     ban.teamId === playerTeam[0]?.teamId &&
                     ban.championId !== -1
                 ).length === 0 && (
-                  <p className="text-gray-500 text-sm">No bans</p>
+                  <p className="text-gray-500 dark:text-slate-400 text-sm">No bans</p>
                 )}
               </div>
             </div>
             <div>
-              <h4 className="font-medium text-red-700 mb-2">
+              <h4 className="font-medium text-red-700 dark:text-red-400 mb-2">
                 Team {enemyTeam[0]?.teamId || "2"} Bans
               </h4>
               <div className="flex flex-wrap gap-2">
@@ -310,7 +310,7 @@ export default function LiveGame({ liveGameData }: LiveGameProps) {
                         >
                           {ban.championId}
                         </div>
-                        <p className="text-xs text-center mt-1 text-red-700">
+                        <p className="text-xs text-center mt-1 text-red-700 dark:text-red-400">
                           {championInfo.name}
                         </p>
                       </div>
@@ -320,7 +320,7 @@ export default function LiveGame({ liveGameData }: LiveGameProps) {
                   (ban) =>
                     ban.teamId === enemyTeam[0]?.teamId && ban.championId !== -1
                 ).length === 0 && (
-                  <p className="text-gray-500 text-sm">No bans</p>
+                  <p className="text-gray-500 dark:text-slate-400 text-sm">No bans</p>
                 )}
               </div>
             </div>
@@ -334,7 +334,7 @@ export default function LiveGame({ liveGameData }: LiveGameProps) {
 export function NoActiveGame({ playerName }: { playerName: string }) {
   return (
     <div className="w-full max-w-2xl mx-auto p-6">
-      <div className="bg-white rounded-lg shadow-lg p-8 text-center">
+      <div className="bg-white dark:bg-slate-900 rounded-lg shadow-lg p-8 text-center">
         <div className="text-gray-400 mb-4">
           <svg
             className="w-16 h-16 mx-auto"
@@ -350,14 +350,14 @@ export function NoActiveGame({ playerName }: { playerName: string }) {
             />
           </svg>
         </div>
-        <h3 className="text-xl font-semibold text-gray-800 mb-2">
+          <h3 className="text-xl font-semibold text-gray-800 dark:text-slate-100 mb-2">
           No Active Game
         </h3>
-        <p className="text-gray-600 mb-4">
+        <p className="text-gray-600 dark:text-slate-400 mb-4">
           <span className="font-medium">{playerName}</span> is currently not in
           a match.
         </p>
-        <p className="text-sm text-gray-500">
+        <p className="text-sm text-gray-500 dark:text-slate-400">
           Try again when the player joins a game or check their match history
           instead.
         </p>

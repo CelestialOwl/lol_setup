@@ -1,5 +1,5 @@
 // Static champion and summoner spell data mappings
-// This is a lightweight approach - you could also fetch from Data Dragon API
+// Sourced from local dragontail dataset: dragontail/16.9.1/data/en_GB/
 
 export const CHAMPIONS: { [key: number]: { name: string; key: string } } = {
   1: { name: "Annie", key: "Annie" },
@@ -79,9 +79,7 @@ export const CHAMPIONS: { [key: number]: { name: string; key: string } } = {
   84: { name: "Akali", key: "Akali" },
   85: { name: "Kennen", key: "Kennen" },
   86: { name: "Garen", key: "Garen" },
-  87: { name: "Leona", key: "Leona" },
-  88: { name: "Talon", key: "Talon" },
-  89: { name: "Riven", key: "Riven" },
+  89: { name: "Leona", key: "Leona" },
   90: { name: "Malzahar", key: "Malzahar" },
   91: { name: "Talon", key: "Talon" },
   92: { name: "Riven", key: "Riven" },
@@ -106,7 +104,6 @@ export const CHAMPIONS: { [key: number]: { name: string; key: string } } = {
   120: { name: "Hecarim", key: "Hecarim" },
   121: { name: "Kha'Zix", key: "Khazix" },
   122: { name: "Darius", key: "Darius" },
-  123: { name: "Jayce", key: "Jayce" },
   126: { name: "Jayce", key: "Jayce" },
   127: { name: "Lissandra", key: "Lissandra" },
   131: { name: "Diana", key: "Diana" },
@@ -129,8 +126,10 @@ export const CHAMPIONS: { [key: number]: { name: string; key: string } } = {
   201: { name: "Braum", key: "Braum" },
   202: { name: "Jhin", key: "Jhin" },
   203: { name: "Kindred", key: "Kindred" },
+  221: { name: "Zeri", key: "Zeri" },
   222: { name: "Jinx", key: "Jinx" },
   223: { name: "Tahm Kench", key: "TahmKench" },
+  233: { name: "Briar", key: "Briar" },
   234: { name: "Viego", key: "Viego" },
   235: { name: "Senna", key: "Senna" },
   236: { name: "Lucian", key: "Lucian" },
@@ -150,6 +149,8 @@ export const CHAMPIONS: { [key: number]: { name: string; key: string } } = {
   427: { name: "Ivern", key: "Ivern" },
   429: { name: "Kalista", key: "Kalista" },
   432: { name: "Bard", key: "Bard" },
+  497: { name: "Rakan", key: "Rakan" },
+  498: { name: "Xayah", key: "Xayah" },
   516: { name: "Ornn", key: "Ornn" },
   517: { name: "Sylas", key: "Sylas" },
   518: { name: "Neeko", key: "Neeko" },
@@ -158,14 +159,21 @@ export const CHAMPIONS: { [key: number]: { name: string; key: string } } = {
   555: { name: "Pyke", key: "Pyke" },
   711: { name: "Vex", key: "Vex" },
   777: { name: "Yone", key: "Yone" },
+  799: { name: "Ambessa", key: "Ambessa" },
+  800: { name: "Mel", key: "Mel" },
+  804: { name: "Yunara", key: "Yunara" },
   875: { name: "Sett", key: "Sett" },
   876: { name: "Lillia", key: "Lillia" },
   887: { name: "Gwen", key: "Gwen" },
   888: { name: "Renata Glasc", key: "Renata" },
+  893: { name: "Aurora", key: "Aurora" },
   895: { name: "Nilah", key: "Nilah" },
   897: { name: "K'Sante", key: "KSante" },
   901: { name: "Smolder", key: "Smolder" },
-  902: { name: "Ambessa", key: "Ambessa" },
+  902: { name: "Milio", key: "Milio" },
+  904: { name: "Zaahen", key: "Zaahen" },
+  910: { name: "Hwei", key: "Hwei" },
+  950: { name: "Naafiri", key: "Naafiri" },
 };
 
 export const SUMMONER_SPELLS: { [key: number]: { name: string; key: string } } =
@@ -183,7 +191,11 @@ export const SUMMONER_SPELLS: { [key: number]: { name: string; key: string } } =
     30: { name: "To the King!", key: "SummonerPoroRecall" },
     31: { name: "Poro Toss", key: "SummonerPoroThrow" },
     32: { name: "Mark", key: "SummonerSnowball" },
-    39: { name: "Ultra (Rapidly Flung)", key: "SummonerUrf" },
+    39: { name: "Mark", key: "SummonerSnowURFSnowball_Mark" },
+    54: { name: "Placeholder", key: "Summoner_UltBookPlaceholder" },
+    55: { name: "Placeholder and Attack-Smite", key: "Summoner_UltBookSmitePlaceholder" },
+    2201: { name: "Flee", key: "SummonerCherryHold" },
+    2202: { name: "Flash", key: "SummonerCherryFlash" },
   };
 
 export const getChampionInfo = (championId: number) => {
@@ -202,23 +214,17 @@ export const getSummonerSpellInfo = (spellId: number) => {
   return spell;
 };
 
-export const getChampionImageUrl = (
-  championKey: string,
-  version = "14.19.1"
-) => {
+export const getChampionImageUrl = (championKey: string) => {
   if (championKey === "Unknown") return null;
-  return `https://ddragon.leagueoflegends.com/cdn/${version}/img/champion/${championKey}.png`;
+  return `/dragontail/16.9.1/img/champion/${championKey}.png`;
 };
 
-export const getSummonerSpellImageUrl = (
-  spellKey: string,
-  version = "14.19.1"
-) => {
+export const getSummonerSpellImageUrl = (spellKey: string) => {
   if (spellKey === "Unknown") return null;
-  return `https://ddragon.leagueoflegends.com/cdn/${version}/img/spell/${spellKey}.png`;
+  return `/dragontail/16.9.1/img/spell/${spellKey}.png`;
 };
 
-export const getItemImageUrl = (itemId: number, version = "14.19.1") => {
+export const getItemImageUrl = (itemId: number) => {
   if (!itemId) return null;
-  return `https://ddragon.leagueoflegends.com/cdn/${version}/img/item/${itemId}.png`;
+  return `/dragontail/16.9.1/img/item/${itemId}.png`;
 };
