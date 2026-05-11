@@ -4,3 +4,5 @@ node_modules/
 lol-match-tracker
 
 dragontail/
+
+.DS_Store
