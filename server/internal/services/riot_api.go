@@ -7,8 +7,10 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strconv"
 	"time"
 
+	"lol-match-tracker/internal/metrics"
 	"lol-match-tracker/internal/models"
 )
 
@@ -32,7 +34,7 @@ func (r *RiotAPIService) GetAccountByRiotID(ctx context.Context, gameName, tagLi
 		r.getRegionCluster(region), url.PathEscape(gameName), url.PathEscape(tagLine))
 
 	var account models.AccountInfo
-	err := r.makeRequest(ctx, url, &account)
+	err := r.makeRequest(ctx, "account", url, &account)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get account: %w", err)
 	}
@@ -45,7 +47,7 @@ func (r *RiotAPIService) GetSummonerByPUUID(ctx context.Context, puuid, region s
 	url := fmt.Sprintf("https://%s.api.riotgames.com/lol/summoner/v4/summoners/by-puuid/%s", region, puuid)
 
 	var summoner models.SummonerInfo
-	err := r.makeRequest(ctx, url, &summoner)
+	err := r.makeRequest(ctx, "summoner", url, &summoner)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get summoner: %w", err)
 	}
@@ -60,7 +62,7 @@ func (r *RiotAPIService) GetMatchList(ctx context.Context, puuid, region string,
 		regionCluster, puuid, count)
 
 	var matchIds []string
-	err := r.makeRequest(ctx, url, &matchIds)
+	err := r.makeRequest(ctx, "match_list", url, &matchIds)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get match list: %w", err)
 	}
@@ -74,7 +76,7 @@ func (r *RiotAPIService) GetMatch(ctx context.Context, matchID, region string) (
 	url := fmt.Sprintf("https://%s.api.riotgames.com/lol/match/v5/matches/%s", regionCluster, matchID)
 
 	var matchData models.MatchData
-	err := r.makeRequest(ctx, url, &matchData)
+	err := r.makeRequest(ctx, "match", url, &matchData)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get match: %w", err)
 	}
@@ -88,7 +90,7 @@ func (r *RiotAPIService) GetCurrentGameInfo(ctx context.Context, summonerID, reg
 		region, summonerID)
 
 	var liveGame models.LiveGameInfo
-	err := r.makeRequest(ctx, url, &liveGame)
+	err := r.makeRequest(ctx, "current_game_v4", url, &liveGame)
 	if err != nil {
 		// If there's no active game, return nil without error
 		if err.Error() == "404" {
@@ -107,7 +109,7 @@ func (r *RiotAPIService) GetCurrentGameByPUUID(ctx context.Context, puuid, regio
 		region, puuid)
 
 	var gameData map[string]interface{}
-	if err := r.makeRequest(ctx, url, &gameData); err != nil {
+	if err := r.makeRequest(ctx, "live_game", url, &gameData); err != nil {
 		return nil, err
 	}
 
@@ -121,15 +123,19 @@ func (r *RiotAPIService) GetLeagueEntriesByPUUID(ctx context.Context, puuid, reg
 		region, url.PathEscape(puuid))
 
 	var entries []models.LeagueEntry
-	if err := r.makeRequest(ctx, apiURL, &entries); err != nil {
+	if err := r.makeRequest(ctx, "rank", apiURL, &entries); err != nil {
 		return nil, fmt.Errorf("failed to get league entries: %w", err)
 	}
 
 	return entries, nil
 }
 
-// makeRequest makes an HTTP request to the Riot API
-func (r *RiotAPIService) makeRequest(ctx context.Context, url string, dest interface{}) error {
+// makeRequest makes an authenticated GET request to the Riot API, records
+// Prometheus metrics (call count by endpoint+status, latency by endpoint),
+// and decodes the JSON response body into dest.
+func (r *RiotAPIService) makeRequest(ctx context.Context, endpoint, url string, dest interface{}) error {
+	start := time.Now()
+
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
 		return err
@@ -139,10 +145,17 @@ func (r *RiotAPIService) makeRequest(ctx context.Context, url string, dest inter
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := r.httpClient.Do(req)
+	duration := time.Since(start)
+	metrics.RiotAPIDuration.WithLabelValues(endpoint).Observe(duration.Seconds())
+
 	if err != nil {
+		metrics.RiotAPICallsTotal.WithLabelValues(endpoint, "error").Inc()
 		return err
 	}
 	defer resp.Body.Close()
+
+	statusStr := strconv.Itoa(resp.StatusCode)
+	metrics.RiotAPICallsTotal.WithLabelValues(endpoint, statusStr).Inc()
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)

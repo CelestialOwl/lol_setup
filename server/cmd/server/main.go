@@ -13,12 +13,14 @@ import (
 	"lol-match-tracker/internal/config"
 	"lol-match-tracker/internal/database"
 	"lol-match-tracker/internal/handlers"
+	_ "lol-match-tracker/internal/metrics" // register Prometheus metrics on import
 	"lol-match-tracker/internal/middleware"
 	"lol-match-tracker/internal/repository"
 	"lol-match-tracker/internal/services"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 func main() {
@@ -75,6 +77,10 @@ func main() {
 		AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization", "X-Requested-With", "X-Request-ID"},
 		AllowCredentials: true,
 	}))
+
+	// Metrics endpoint — scraped by Prometheus every 15 s.
+	// Excluded from request logging middleware to avoid noise.
+	router.GET("/metrics", gin.WrapH(promhttp.Handler()))
 
 	// Health check endpoint — verifies DB and Redis are reachable
 	router.GET("/health", func(c *gin.Context) {

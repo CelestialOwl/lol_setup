@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"lol-match-tracker/internal/config"
+	"lol-match-tracker/internal/metrics"
 
 	"github.com/go-redis/redis/v8"
 )
@@ -51,28 +52,51 @@ func (r *RedisClient) Ping(ctx context.Context) error {
 }
 
 func (r *RedisClient) Set(ctx context.Context, key string, value interface{}, ttl time.Duration) error {
+	start := time.Now()
+
 	jsonData, err := json.Marshal(value)
 	if err != nil {
 		return fmt.Errorf("failed to marshal value: %w", err)
 	}
 
-	return r.client.Set(ctx, key, jsonData, ttl).Err()
+	setErr := r.client.Set(ctx, key, jsonData, ttl).Err()
+	metrics.CacheOperationDuration.WithLabelValues("set").Observe(time.Since(start).Seconds())
+	if setErr != nil {
+		metrics.CacheOperationsTotal.WithLabelValues("set", "error").Inc()
+	} else {
+		metrics.CacheOperationsTotal.WithLabelValues("set", "ok").Inc()
+	}
+	return setErr
 }
 
 func (r *RedisClient) Get(ctx context.Context, key string, dest interface{}) error {
+	start := time.Now()
+
 	val, err := r.client.Get(ctx, key).Result()
+	metrics.CacheOperationDuration.WithLabelValues("get").Observe(time.Since(start).Seconds())
 	if err != nil {
 		if err == redis.Nil {
+			metrics.CacheOperationsTotal.WithLabelValues("get", "miss").Inc()
 			return ErrCacheMiss
 		}
+		metrics.CacheOperationsTotal.WithLabelValues("get", "error").Inc()
 		return fmt.Errorf("failed to get value: %w", err)
 	}
 
+	metrics.CacheOperationsTotal.WithLabelValues("get", "hit").Inc()
 	return json.Unmarshal([]byte(val), dest)
 }
 
 func (r *RedisClient) Delete(ctx context.Context, key string) error {
-	return r.client.Del(ctx, key).Err()
+	start := time.Now()
+	err := r.client.Del(ctx, key).Err()
+	metrics.CacheOperationDuration.WithLabelValues("delete").Observe(time.Since(start).Seconds())
+	if err != nil {
+		metrics.CacheOperationsTotal.WithLabelValues("delete", "error").Inc()
+	} else {
+		metrics.CacheOperationsTotal.WithLabelValues("delete", "ok").Inc()
+	}
+	return err
 }
 
 func (r *RedisClient) Exists(ctx context.Context, key string) (bool, error) {

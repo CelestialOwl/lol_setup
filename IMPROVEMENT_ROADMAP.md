@@ -90,10 +90,11 @@ This file is the persisted roadmap for future reference.
 
 ## Phase 3: Observability (After Reliability)
 
-### 3.1 Metrics with Prometheus + Grafana
+### 3.1 Metrics with Prometheus + Grafana ✅
 - Add request metrics (count, latency, inflight).
 - Add app metrics (cache hit/miss, Riot error rate, DB timing).
 - Expose `/metrics`.
+- Pre-built Grafana dashboard: cache hit rate, resolution breakdown, Riot API RPM/RPH/RPD, DB latency.
 
 ### 3.2 Tracing with OpenTelemetry + Jaeger
 - Add spans across handlers/services/repos/cache/Riot HTTP calls.

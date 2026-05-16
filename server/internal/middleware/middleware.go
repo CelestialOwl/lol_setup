@@ -3,13 +3,16 @@ package middleware
 import (
 	"fmt"
 	"log/slog"
+	"strconv"
 	"time"
+
+	"lol-match-tracker/internal/metrics"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
 
-// Logger logs HTTP requests with method, path, status, latency, and request-ID.
+// Logger logs HTTP requests and records Prometheus HTTP metrics.
 func Logger() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		start := time.Now()
@@ -21,12 +24,22 @@ func Logger() gin.HandlerFunc {
 
 		// Calculate latency
 		latency := time.Since(start)
-
-		// Get status
 		status := c.Writer.Status()
 
+		// c.FullPath returns the registered pattern e.g. /api/summoner/:puuid/matches
+		// which keeps Prometheus label cardinality bounded regardless of path param values.
+		route := c.FullPath()
+		if route == "" {
+			route = "unknown"
+		}
+		statusStr := strconv.Itoa(status)
+		method := c.Request.Method
+
+		metrics.HTTPRequestsTotal.WithLabelValues(method, route, statusStr).Inc()
+		metrics.HTTPRequestDuration.WithLabelValues(method, route, statusStr).Observe(latency.Seconds())
+
 		slog.Info("http_request",
-			"method", c.Request.Method,
+			"method", method,
 			"path", path,
 			"query", raw,
 			"status", status,

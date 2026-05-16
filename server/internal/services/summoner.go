@@ -8,6 +8,7 @@ import (
 
 	"lol-match-tracker/internal/config"
 	"lol-match-tracker/internal/interfaces"
+	"lol-match-tracker/internal/metrics"
 	"lol-match-tracker/internal/models"
 )
 
@@ -47,6 +48,7 @@ func (s *SummonerService) GetSummonerProfile(ctx context.Context, gameName, tagL
 	if err := s.cache.Get(cacheCtx, cacheKey, &cached); err == nil {
 		cancel()
 		slog.Debug("profile cache hit", "summoner", gameName+"#"+tagLine)
+		metrics.ResolutionTotal.WithLabelValues("profile", "cache").Inc()
 		return &cached, nil
 	}
 	cancel()
@@ -57,6 +59,7 @@ func (s *SummonerService) GetSummonerProfile(ctx context.Context, gameName, tagL
 	cancel()
 	if err == nil && dbSummoner != nil {
 		slog.Debug("profile database hit", "summoner", gameName+"#"+tagLine)
+		metrics.ResolutionTotal.WithLabelValues("profile", "db").Inc()
 		summonerInfo := &models.SummonerInfo{
 			PUUID:         dbSummoner.PUUID,
 			SummonerLevel: dbSummoner.SummonerLevel,
@@ -90,6 +93,7 @@ func (s *SummonerService) GetSummonerProfile(ctx context.Context, gameName, tagL
 
 	// 3. Riot API
 	slog.Info("fetching profile from Riot API", "summoner", gameName+"#"+tagLine)
+	metrics.ResolutionTotal.WithLabelValues("profile", "riot_api").Inc()
 	riotCtx, riotCancel := withTimeout(ctx, riotTimeout)
 	account, err := s.riotAPI.GetAccountByRiotID(riotCtx, gameName, tagLine, region)
 	riotCancel()
@@ -144,6 +148,7 @@ func (s *SummonerService) GetMatchHistory(ctx context.Context, puuid, region str
 	if err := s.cache.Get(cacheCtx, cacheKey, &cached); err == nil {
 		cancel()
 		slog.Debug("matches cache hit", "puuid", puuid)
+		metrics.ResolutionTotal.WithLabelValues("matches", "cache").Inc()
 		return &cached, nil
 	}
 	cancel()
@@ -154,6 +159,7 @@ func (s *SummonerService) GetMatchHistory(ctx context.Context, puuid, region str
 	cancel()
 	if err == nil && len(dbMatches) > 0 {
 		slog.Debug("matches database hit", "puuid", puuid, "count", len(dbMatches))
+		metrics.ResolutionTotal.WithLabelValues("matches", "db").Inc()
 		var matchData []models.MatchData
 		for _, m := range dbMatches {
 			matchData = append(matchData, m.MatchData)
@@ -168,6 +174,7 @@ func (s *SummonerService) GetMatchHistory(ctx context.Context, puuid, region str
 
 	// 3. Riot API
 	slog.Info("fetching match history from Riot API", "puuid", puuid)
+	metrics.ResolutionTotal.WithLabelValues("matches", "riot_api").Inc()
 	riotCtx, riotCancel := withTimeout(ctx, riotTimeout)
 	matchIDs, err := s.riotAPI.GetMatchList(riotCtx, puuid, region, 10)
 	riotCancel()

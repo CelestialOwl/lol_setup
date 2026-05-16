@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"lol-match-tracker/internal/config"
+	"lol-match-tracker/internal/metrics"
 
 	_ "github.com/lib/pq"
 )
@@ -61,6 +62,7 @@ func (db *DB) QueryContext(ctx context.Context, query string, args ...interface{
 	rows, err := db.DB.QueryContext(ctx, query, args...)
 	duration := time.Since(start)
 
+	metrics.DBQueryDuration.WithLabelValues("query").Observe(duration.Seconds())
 	slog.Debug("db_query_context", "duration_ms", duration.Milliseconds(), "query", query)
 	return rows, err
 }
@@ -81,6 +83,7 @@ func (db *DB) QueryRowContext(ctx context.Context, query string, args ...interfa
 	row := db.DB.QueryRowContext(ctx, query, args...)
 	duration := time.Since(start)
 
+	metrics.DBQueryDuration.WithLabelValues("queryrow").Observe(duration.Seconds())
 	slog.Debug("db_query_row_context", "duration_ms", duration.Milliseconds(), "query", query)
 	return row
 }
@@ -101,6 +104,7 @@ func (db *DB) ExecContext(ctx context.Context, query string, args ...interface{}
 	result, err := db.DB.ExecContext(ctx, query, args...)
 	duration := time.Since(start)
 
+	metrics.DBQueryDuration.WithLabelValues("exec").Observe(duration.Seconds())
 	slog.Debug("db_exec_context", "duration_ms", duration.Milliseconds(), "query", query)
 	return result, err
 }
