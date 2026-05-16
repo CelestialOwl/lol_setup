@@ -10,7 +10,7 @@ Review of proposed improvements against the current LoL Match Tracker codebase (
 - [x] Phase 1.1: Context propagation + timeouts
 - [x] Phase 1.2: Structured logging cleanup
 - [x] Phase 1.3: Unit tests (server)
-- [ ] Phase 1.4: CI/CD pipeline
+- [x] Phase 1.4: CI/CD pipeline
 - [ ] Phase 2+
 
 ---
