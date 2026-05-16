@@ -32,7 +32,19 @@ build:
 	$(GOBUILD) -o $(BINARY) -v ./cmd/server
 
 test:
-	$(GOTEST) -v ./...
+	$(GOTEST) -v -race ./...
+
+test-short:
+	$(GOTEST) -short -v ./...
+
+test-coverage:
+	$(GOTEST) -v -race -coverprofile=coverage.out ./...
+	$(GOCMD) tool cover -html=coverage.out -o coverage.html
+	@echo "Coverage report: coverage.html"
+
+lint:
+	@which golangci-lint > /dev/null 2>&1 || (echo "golangci-lint not installed. Run: brew install golangci-lint" && exit 1)
+	golangci-lint run ./...
 
 clean:
 	rm -f $(BINARY) $(BINARY)_unix

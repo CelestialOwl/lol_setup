@@ -5,16 +5,18 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+
+	"lol-match-tracker/internal/interfaces"
 )
 
 // ErrNotInGame is returned when the player is not currently in an active game.
 var ErrNotInGame = errors.New("player is not in an active game")
 
 type LiveGameService struct {
-	riotAPI *RiotAPIService
+	riotAPI interfaces.RiotClient
 }
 
-func NewLiveGameService(riotAPI *RiotAPIService) *LiveGameService {
+func NewLiveGameService(riotAPI interfaces.RiotClient) *LiveGameService {
 	return &LiveGameService{riotAPI: riotAPI}
 }
 

@@ -6,25 +6,24 @@ import (
 	"log/slog"
 	"time"
 
-	"lol-match-tracker/internal/cache"
 	"lol-match-tracker/internal/config"
+	"lol-match-tracker/internal/interfaces"
 	"lol-match-tracker/internal/models"
-	"lol-match-tracker/internal/repository"
 )
 
 type SummonerService struct {
-	summonerRepo *repository.SummonerRepository
-	matchRepo    *repository.MatchRepository
-	riotAPI      *RiotAPIService
-	cache        *cache.RedisClient
+	summonerRepo interfaces.SummonerRepository
+	matchRepo    interfaces.MatchRepository
+	riotAPI      interfaces.RiotClient
+	cache        interfaces.Cache
 	config       *config.Config
 }
 
 func NewSummonerService(
-	summonerRepo *repository.SummonerRepository,
-	matchRepo *repository.MatchRepository,
-	riotAPI *RiotAPIService,
-	cache *cache.RedisClient,
+	summonerRepo interfaces.SummonerRepository,
+	matchRepo interfaces.MatchRepository,
+	riotAPI interfaces.RiotClient,
+	cache interfaces.Cache,
 	config *config.Config,
 ) *SummonerService {
 	return &SummonerService{
