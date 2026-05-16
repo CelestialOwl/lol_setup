@@ -4,6 +4,15 @@
 
 Review of proposed improvements against the current LoL Match Tracker codebase (Go backend + Next.js frontend). The server has major foundational gaps (tests, CI/CD, rate limiting, context propagation), while the client is in better shape. Work is organized into phased implementation.
 
+## Implementation Status
+
+- [x] Step 0: Save roadmap in project
+- [x] Phase 1.1: Context propagation + timeouts
+- [x] Phase 1.2: Structured logging cleanup
+- [ ] Phase 1.3: Unit tests (server)
+- [ ] Phase 1.4: CI/CD pipeline
+- [ ] Phase 2+
+
 ---
 
 ## Current Project State Summary

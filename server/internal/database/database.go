@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"log"
 	"log/slog"
 	"time"
 
@@ -52,7 +51,7 @@ func (db *DB) Query(query string, args ...interface{}) (*sql.Rows, error) {
 	rows, err := db.DB.Query(query, args...)
 	duration := time.Since(start)
 
-	log.Printf("Query executed in %v: %s", duration, query)
+	slog.Debug("db_query", "duration_ms", duration.Milliseconds(), "query", query)
 	return rows, err
 }
 
@@ -62,7 +61,7 @@ func (db *DB) QueryContext(ctx context.Context, query string, args ...interface{
 	rows, err := db.DB.QueryContext(ctx, query, args...)
 	duration := time.Since(start)
 
-	log.Printf("QueryContext executed in %v: %s", duration, query)
+	slog.Debug("db_query_context", "duration_ms", duration.Milliseconds(), "query", query)
 	return rows, err
 }
 
@@ -72,7 +71,7 @@ func (db *DB) QueryRow(query string, args ...interface{}) *sql.Row {
 	row := db.DB.QueryRow(query, args...)
 	duration := time.Since(start)
 
-	log.Printf("QueryRow executed in %v: %s", duration, query)
+	slog.Debug("db_query_row", "duration_ms", duration.Milliseconds(), "query", query)
 	return row
 }
 
@@ -82,7 +81,7 @@ func (db *DB) QueryRowContext(ctx context.Context, query string, args ...interfa
 	row := db.DB.QueryRowContext(ctx, query, args...)
 	duration := time.Since(start)
 
-	log.Printf("QueryRowContext executed in %v: %s", duration, query)
+	slog.Debug("db_query_row_context", "duration_ms", duration.Milliseconds(), "query", query)
 	return row
 }
 
@@ -92,7 +91,7 @@ func (db *DB) Exec(query string, args ...interface{}) (sql.Result, error) {
 	result, err := db.DB.Exec(query, args...)
 	duration := time.Since(start)
 
-	log.Printf("Exec executed in %v: %s", duration, query)
+	slog.Debug("db_exec", "duration_ms", duration.Milliseconds(), "query", query)
 	return result, err
 }
 
@@ -102,6 +101,6 @@ func (db *DB) ExecContext(ctx context.Context, query string, args ...interface{}
 	result, err := db.DB.ExecContext(ctx, query, args...)
 	duration := time.Since(start)
 
-	log.Printf("ExecContext executed in %v: %s", duration, query)
+	slog.Debug("db_exec_context", "duration_ms", duration.Milliseconds(), "query", query)
 	return result, err
 }

@@ -2,7 +2,6 @@ package middleware
 
 import (
 	"fmt"
-	"log"
 	"log/slog"
 	"time"
 
@@ -26,13 +25,15 @@ func Logger() gin.HandlerFunc {
 		// Get status
 		status := c.Writer.Status()
 
-		// Log format
-		log.Printf("[%s] %s %s %d %v",
-			c.Request.Method,
-			path,
-			raw,
-			status,
-			latency,
+		slog.Info("http_request",
+			"method", c.Request.Method,
+			"path", path,
+			"query", raw,
+			"status", status,
+			"latency_ms", latency.Milliseconds(),
+			"request_id", c.GetString("request_id"),
+			"client_ip", c.ClientIP(),
+			"user_agent", c.Request.UserAgent(),
 		)
 	}
 }

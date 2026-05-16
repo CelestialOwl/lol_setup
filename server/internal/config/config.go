@@ -22,8 +22,9 @@ type Config struct {
 	RedisPassword string
 
 	// Server
-	Port    string
-	GinMode string
+	Port     string
+	GinMode  string
+	LogLevel string
 
 	// API
 	RiotAPIKey string
@@ -55,8 +56,9 @@ func Load() *Config {
 		RedisPassword: getEnv("REDIS_PASSWORD", ""),
 
 		// Server
-		Port:    getEnv("PORT", "8080"),
-		GinMode: getEnv("GIN_MODE", "debug"),
+		Port:     getEnv("PORT", "8080"),
+		GinMode:  getEnv("GIN_MODE", "debug"),
+		LogLevel: getEnv("LOG_LEVEL", "info"),
 
 		// API
 		RiotAPIKey: getEnv("RIOT_API_KEY", ""),

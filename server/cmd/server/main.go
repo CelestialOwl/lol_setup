@@ -25,6 +25,11 @@ func main() {
 	// Load configuration
 	cfg := config.Load()
 
+	// Configure structured logger
+	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
+		Level: parseLogLevel(cfg.LogLevel),
+	})))
+
 	// Set Gin mode
 	gin.SetMode(cfg.GinMode)
 
@@ -143,4 +148,17 @@ func main() {
 		slog.Error("server forced shutdown", "error", err)
 	}
 	slog.Info("server stopped")
+}
+
+func parseLogLevel(level string) slog.Level {
+	switch level {
+	case "debug", "DEBUG":
+		return slog.LevelDebug
+	case "warn", "WARN", "warning", "WARNING":
+		return slog.LevelWarn
+	case "error", "ERROR":
+		return slog.LevelError
+	default:
+		return slog.LevelInfo
+	}
 }
