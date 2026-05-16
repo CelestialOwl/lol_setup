@@ -1,6 +1,7 @@
 package services
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"time"
@@ -38,18 +39,23 @@ func NewSummonerService(
 // GetSummonerProfile fetches account + summoner info only (no matches).
 // It checks Redis → Postgres → Riot API and is a fast 2-call path.
 // On every live fetch it also retrieves and stores the player's rank.
-func (s *SummonerService) GetSummonerProfile(gameName, tagLine, region string) (*models.SummonerProfileResponse, error) {
+func (s *SummonerService) GetSummonerProfile(ctx context.Context, gameName, tagLine, region string) (*models.SummonerProfileResponse, error) {
 	cacheKey := fmt.Sprintf("profile:%s:%s:%s", region, gameName, tagLine)
 
 	// 1. Redis cache
 	var cached models.SummonerProfileResponse
-	if err := s.cache.Get(cacheKey, &cached); err == nil {
+	cacheCtx, cancel := withTimeout(ctx, redisTimeout)
+	if err := s.cache.Get(cacheCtx, cacheKey, &cached); err == nil {
+		cancel()
 		slog.Debug("profile cache hit", "summoner", gameName+"#"+tagLine)
 		return &cached, nil
 	}
+	cancel()
 
 	// 2. Postgres — recently-updated row
-	dbSummoner, err := s.summonerRepo.FindRecent(gameName, tagLine, region, s.config.SummonerCacheTTL)
+	dbCtx, cancel := withTimeout(ctx, dbTimeout)
+	dbSummoner, err := s.summonerRepo.FindRecent(dbCtx, gameName, tagLine, region, s.config.SummonerCacheTTL)
+	cancel()
 	if err == nil && dbSummoner != nil {
 		slog.Debug("profile database hit", "summoner", gameName+"#"+tagLine)
 		summonerInfo := &models.SummonerInfo{
@@ -58,9 +64,11 @@ func (s *SummonerService) GetSummonerProfile(gameName, tagLine, region string) (
 			ProfileIconID: dbSummoner.ProfileIconID,
 		}
 		// Best-effort refresh from Riot — ignore errors
-		if fresh, e := s.riotAPI.GetSummonerByPUUID(dbSummoner.PUUID, region); e == nil {
+		riotCtx, riotCancel := withTimeout(ctx, riotTimeout)
+		if fresh, e := s.riotAPI.GetSummonerByPUUID(riotCtx, dbSummoner.PUUID, region); e == nil {
 			summonerInfo = fresh
 		}
+		riotCancel()
 		resp := &models.SummonerProfileResponse{
 			Account: models.AccountInfo{
 				PUUID:    dbSummoner.PUUID,
@@ -70,26 +78,35 @@ func (s *SummonerService) GetSummonerProfile(gameName, tagLine, region string) (
 			Summoner: *summonerInfo,
 		}
 		// Attach rank from DB (no live fetch on cache hit)
-		if rankEntries, e := s.summonerRepo.GetLatestRankSnapshots(dbSummoner.PUUID); e == nil {
+		dbCtx, cancel = withTimeout(ctx, dbTimeout)
+		if rankEntries, e := s.summonerRepo.GetLatestRankSnapshots(dbCtx, dbSummoner.PUUID); e == nil {
 			resp.Rank = rankEntries
 		}
-		s.cache.Set(cacheKey, resp, time.Duration(s.config.SummonerCacheTTL)*time.Second) //nolint:errcheck
+		cancel()
+		cacheCtx, cancel = withTimeout(ctx, redisTimeout)
+		s.cache.Set(cacheCtx, cacheKey, resp, time.Duration(s.config.SummonerCacheTTL)*time.Second) //nolint:errcheck
+		cancel()
 		return resp, nil
 	}
 
 	// 3. Riot API
 	slog.Info("fetching profile from Riot API", "summoner", gameName+"#"+tagLine)
-	account, err := s.riotAPI.GetAccountByRiotID(gameName, tagLine, region)
+	riotCtx, riotCancel := withTimeout(ctx, riotTimeout)
+	account, err := s.riotAPI.GetAccountByRiotID(riotCtx, gameName, tagLine, region)
+	riotCancel()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get account: %w", err)
 	}
-	summonerInfo, err := s.riotAPI.GetSummonerByPUUID(account.PUUID, region)
+	riotCtx, riotCancel = withTimeout(ctx, riotTimeout)
+	summonerInfo, err := s.riotAPI.GetSummonerByPUUID(riotCtx, account.PUUID, region)
+	riotCancel()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get summoner info: %w", err)
 	}
 
 	// Persist summoner
-	if err := s.summonerRepo.Upsert(&models.Summoner{
+	dbCtx, cancel = withTimeout(ctx, dbTimeout)
+	if err := s.summonerRepo.Upsert(dbCtx, &models.Summoner{
 		PUUID:         account.PUUID,
 		GameName:      account.GameName,
 		TagLine:       account.TagLine,
@@ -99,15 +116,18 @@ func (s *SummonerService) GetSummonerProfile(gameName, tagLine, region string) (
 	}); err != nil {
 		slog.Warn("failed to upsert summoner", "error", err)
 	}
+	cancel()
 
 	// Fetch and store rank for the searched player
-	rankEntries, rankErr := s.FetchAndStoreRank(account.PUUID, region)
+	rankEntries, rankErr := s.FetchAndStoreRank(ctx, account.PUUID, region)
 	if rankErr != nil {
 		slog.Warn("failed to fetch/store rank", "puuid", account.PUUID, "region", region, "error", rankErr)
 	}
 
 	resp := &models.SummonerProfileResponse{Account: *account, Summoner: *summonerInfo, Rank: rankEntries}
-	s.cache.Set(cacheKey, resp, time.Duration(s.config.SummonerCacheTTL)*time.Second) //nolint:errcheck
+	cacheCtx, cancel = withTimeout(ctx, redisTimeout)
+	s.cache.Set(cacheCtx, cacheKey, resp, time.Duration(s.config.SummonerCacheTTL)*time.Second) //nolint:errcheck
+	cancel()
 	return resp, nil
 }
 
@@ -116,40 +136,51 @@ func (s *SummonerService) GetSummonerProfile(gameName, tagLine, region string) (
 // summoner card immediately while match data loads in a follow-up request.
 // The response includes a Ranks map with the latest solo rank from DB for every
 // participant that has one — no live Riot API call is made for other players.
-func (s *SummonerService) GetMatchHistory(puuid, region string) (*models.MatchHistoryResponse, error) {
+func (s *SummonerService) GetMatchHistory(ctx context.Context, puuid, region string) (*models.MatchHistoryResponse, error) {
 	cacheKey := fmt.Sprintf("matches:%s:%s", region, puuid)
 
 	// 1. Redis cache
 	var cached models.MatchHistoryResponse
-	if err := s.cache.Get(cacheKey, &cached); err == nil {
+	cacheCtx, cancel := withTimeout(ctx, redisTimeout)
+	if err := s.cache.Get(cacheCtx, cacheKey, &cached); err == nil {
+		cancel()
 		slog.Debug("matches cache hit", "puuid", puuid)
 		return &cached, nil
 	}
+	cancel()
 
 	// 2. Postgres
-	dbMatches, err := s.matchRepo.GetRecentMatchesForPUUID(puuid, 10)
+	dbCtx, cancel := withTimeout(ctx, dbTimeout)
+	dbMatches, err := s.matchRepo.GetRecentMatchesForPUUID(dbCtx, puuid, 10)
+	cancel()
 	if err == nil && len(dbMatches) > 0 {
 		slog.Debug("matches database hit", "puuid", puuid, "count", len(dbMatches))
 		var matchData []models.MatchData
 		for _, m := range dbMatches {
 			matchData = append(matchData, m.MatchData)
 		}
-		ranks := s.collectParticipantRanks(matchData)
+		ranks := s.collectParticipantRanks(ctx, matchData)
 		resp := &models.MatchHistoryResponse{PUUID: puuid, Matches: matchData, Total: len(matchData), Ranks: ranks}
-		s.cache.Set(cacheKey, resp, time.Duration(s.config.MatchCacheTTL)*time.Second) //nolint:errcheck
+		cacheCtx, cancel = withTimeout(ctx, redisTimeout)
+		s.cache.Set(cacheCtx, cacheKey, resp, time.Duration(s.config.MatchCacheTTL)*time.Second) //nolint:errcheck
+		cancel()
 		return resp, nil
 	}
 
 	// 3. Riot API
 	slog.Info("fetching match history from Riot API", "puuid", puuid)
-	matchIDs, err := s.riotAPI.GetMatchList(puuid, region, 10)
+	riotCtx, riotCancel := withTimeout(ctx, riotTimeout)
+	matchIDs, err := s.riotAPI.GetMatchList(riotCtx, puuid, region, 10)
+	riotCancel()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get match list: %w", err)
 	}
 
 	var matches []models.MatchData
 	for _, matchID := range matchIDs {
-		matchData, err := s.riotAPI.GetMatch(matchID, region)
+		riotCtx, riotCancel = withTimeout(ctx, riotTimeout)
+		matchData, err := s.riotAPI.GetMatch(riotCtx, matchID, region)
+		riotCancel()
 		if err != nil {
 			slog.Warn("failed to fetch match", "match_id", matchID, "error", err)
 			continue
@@ -158,20 +189,22 @@ func (s *SummonerService) GetMatchHistory(puuid, region string) (*models.MatchHi
 	}
 
 	// Best-effort persistence
-	if err := s.storeMatchData(matches, region); err != nil {
+	if err := s.storeMatchData(ctx, matches, region); err != nil {
 		slog.Warn("failed to store match data", "error", err)
 	}
 
-	ranks := s.collectParticipantRanks(matches)
+	ranks := s.collectParticipantRanks(ctx, matches)
 	resp := &models.MatchHistoryResponse{PUUID: puuid, Matches: matches, Total: len(matches), Ranks: ranks}
-	s.cache.Set(cacheKey, resp, time.Duration(s.config.MatchCacheTTL)*time.Second) //nolint:errcheck
+	cacheCtx, cancel = withTimeout(ctx, redisTimeout)
+	s.cache.Set(cacheCtx, cacheKey, resp, time.Duration(s.config.MatchCacheTTL)*time.Second) //nolint:errcheck
+	cancel()
 	return resp, nil
 }
 
 // collectParticipantRanks gathers all unique participant PUUIDs from a set of
 // match data and batch-queries the DB for their latest solo rank. No Riot API
 // calls are made — data is best-effort from previous snapshots.
-func (s *SummonerService) collectParticipantRanks(matches []models.MatchData) map[string]*models.LeagueEntry {
+func (s *SummonerService) collectParticipantRanks(ctx context.Context, matches []models.MatchData) map[string]*models.LeagueEntry {
 	seen := make(map[string]struct{})
 	var puuids []string
 
@@ -200,7 +233,9 @@ func (s *SummonerService) collectParticipantRanks(matches []models.MatchData) ma
 		}
 	}
 
-	ranks, err := s.summonerRepo.GetLatestSoloRankByPUUIDs(puuids)
+	dbCtx, cancel := withTimeout(ctx, dbTimeout)
+	ranks, err := s.summonerRepo.GetLatestSoloRankByPUUIDs(dbCtx, puuids)
+	cancel()
 	if err != nil {
 		slog.Warn("failed to fetch participant ranks from DB", "error", err)
 		return nil
@@ -211,7 +246,7 @@ func (s *SummonerService) collectParticipantRanks(matches []models.MatchData) ma
 
 // storeMatchData persists match rows and all 10 participants to the database.
 // Participants are stored without a FK to summoners — see schema comments.
-func (s *SummonerService) storeMatchData(matchesData []models.MatchData, region string) error {
+func (s *SummonerService) storeMatchData(ctx context.Context, matchesData []models.MatchData, region string) error {
 	var matches []models.Match
 	for _, matchData := range matchesData {
 		info, ok := matchData["info"].(map[string]interface{})
@@ -266,9 +301,11 @@ func (s *SummonerService) storeMatchData(matchesData []models.MatchData, region 
 						SummonerLevel: int(getFloat64(part, "summonerLevel")),
 						ProfileIconID: int(getFloat64(part, "profileIcon")),
 					}
-					if err := s.summonerRepo.Upsert(summoner); err != nil {
+					dbCtx, cancel := withTimeout(ctx, dbTimeout)
+					if err := s.summonerRepo.Upsert(dbCtx, summoner); err != nil {
 						slog.Warn("failed to upsert participant summoner", "puuid", puuid, "error", err)
 					}
+					cancel()
 				}
 
 				pModels = append(pModels, models.Participant{
@@ -283,65 +320,85 @@ func (s *SummonerService) storeMatchData(matchesData []models.MatchData, region 
 					GoldEarned:   int(getFloat64(part, "goldEarned")),
 				})
 			}
-			if err := s.matchRepo.BulkInsertParticipants(match.MatchID, pModels); err != nil {
+			dbCtx, cancel := withTimeout(ctx, dbTimeout)
+			if err := s.matchRepo.BulkInsertParticipants(dbCtx, match.MatchID, pModels); err != nil {
 				slog.Warn("failed to insert participants", "match_id", match.MatchID, "error", err)
 			}
+			cancel()
 		}
 	}
 
-	if err := s.matchRepo.BulkInsert(matches); err != nil {
+	dbCtx, cancel := withTimeout(ctx, dbTimeout)
+	if err := s.matchRepo.BulkInsert(dbCtx, matches); err != nil {
+		cancel()
 		return fmt.Errorf("failed to bulk insert matches: %w", err)
 	}
+	cancel()
 	return nil
 }
 
 // GetSummonerStats retrieves aggregated win/loss stats for a summoner.
-func (s *SummonerService) GetSummonerStats(puuid string) (*models.MatchStats, error) {
+func (s *SummonerService) GetSummonerStats(ctx context.Context, puuid string) (*models.MatchStats, error) {
 	cacheKey := fmt.Sprintf("stats:%s", puuid)
 
 	var cachedStats models.MatchStats
-	if err := s.cache.Get(cacheKey, &cachedStats); err == nil {
+	cacheCtx, cancel := withTimeout(ctx, redisTimeout)
+	if err := s.cache.Get(cacheCtx, cacheKey, &cachedStats); err == nil {
+		cancel()
 		return &cachedStats, nil
 	}
+	cancel()
 
-	stats, err := s.summonerRepo.GetStats(puuid)
+	dbCtx, cancel := withTimeout(ctx, dbTimeout)
+	stats, err := s.summonerRepo.GetStats(dbCtx, puuid)
+	cancel()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get summoner stats: %w", err)
 	}
 
-	s.cache.Set(cacheKey, stats, 1*time.Hour) //nolint:errcheck
+	cacheCtx, cancel = withTimeout(ctx, redisTimeout)
+	s.cache.Set(cacheCtx, cacheKey, stats, 1*time.Hour) //nolint:errcheck
+	cancel()
 	return stats, nil
 }
 
 // FetchAndStoreRank calls the Riot league API for the given player, persists
 // a snapshot (deduplicated by 1-hour window), and returns the live entries.
 // Only call this for the searched player — not for match participants.
-func (s *SummonerService) FetchAndStoreRank(puuid, region string) ([]models.LeagueEntry, error) {
-	entries, err := s.riotAPI.GetLeagueEntriesByPUUID(puuid, region)
+func (s *SummonerService) FetchAndStoreRank(ctx context.Context, puuid, region string) ([]models.LeagueEntry, error) {
+	riotCtx, riotCancel := withTimeout(ctx, riotTimeout)
+	entries, err := s.riotAPI.GetLeagueEntriesByPUUID(riotCtx, puuid, region)
+	riotCancel()
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch rank from Riot API: %w", err)
 	}
 
-	if err := s.summonerRepo.SaveRankSnapshots(puuid, entries); err != nil {
+	dbCtx, cancel := withTimeout(ctx, dbTimeout)
+	if err := s.summonerRepo.SaveRankSnapshots(dbCtx, puuid, entries); err != nil {
 		slog.Warn("failed to save rank snapshots", "puuid", puuid, "error", err)
 	}
+	cancel()
 
 	return entries, nil
 }
 
 // GetCachedRank returns the latest rank snapshots from DB for any puuid.
 // No Riot API call is made — suitable for non-searched participants.
-func (s *SummonerService) GetCachedRank(puuid string) ([]models.LeagueEntry, error) {
-	return s.summonerRepo.GetLatestRankSnapshots(puuid)
+func (s *SummonerService) GetCachedRank(ctx context.Context, puuid string) ([]models.LeagueEntry, error) {
+	dbCtx, cancel := withTimeout(ctx, dbTimeout)
+	defer cancel()
+	return s.summonerRepo.GetLatestRankSnapshots(dbCtx, puuid)
 }
 
 // GetRankHistory returns all stored rank snapshots for a puuid+queueType
 // ordered oldest-first (for LP-over-time charts).
-func (s *SummonerService) GetRankHistory(puuid, queueType string) ([]models.RankSnapshot, error) {
+func (s *SummonerService) GetRankHistory(ctx context.Context, puuid, queueType string) ([]models.RankSnapshot, error) {
 	if queueType == "" {
 		queueType = "RANKED_SOLO_5x5"
 	}
-	return s.summonerRepo.GetRankHistory(puuid, queueType)
+	dbCtx, cancel := withTimeout(ctx, dbTimeout)
+	defer cancel()
+	return s.summonerRepo.GetRankHistory(dbCtx, puuid, queueType)
 }
 
 // ── safe map helpers ──────────────────────────────────────────────────────────

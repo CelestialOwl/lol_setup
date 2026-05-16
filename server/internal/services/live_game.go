@@ -1,6 +1,7 @@
 package services
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"strings"
@@ -21,13 +22,19 @@ func NewLiveGameService(riotAPI *RiotAPIService) *LiveGameService {
 // and returns a response shaped to match the frontend LiveGameData type:
 //
 //	{ gameInfo, playerTeam, enemyTeam, searchedPlayer, inGame: true }
-func (s *LiveGameService) GetLiveGame(gameName, tagLine, region string) (map[string]interface{}, error) {
-	account, err := s.riotAPI.GetAccountByRiotID(gameName, tagLine, region)
+func (s *LiveGameService) GetLiveGame(ctx context.Context, gameName, tagLine, region string) (map[string]interface{}, error) {
+	riotCtx, cancel := withTimeout(ctx, riotTimeout)
+	defer cancel()
+
+	account, err := s.riotAPI.GetAccountByRiotID(riotCtx, gameName, tagLine, region)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get account: %w", err)
 	}
 
-	gameData, err := s.riotAPI.GetCurrentGameByPUUID(account.PUUID, region)
+	riotCtx, cancel = withTimeout(ctx, riotTimeout)
+	defer cancel()
+
+	gameData, err := s.riotAPI.GetCurrentGameByPUUID(riotCtx, account.PUUID, region)
 	if err != nil {
 		if strings.HasPrefix(err.Error(), "404") {
 			return nil, ErrNotInGame

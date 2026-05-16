@@ -1,6 +1,7 @@
 package services
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -26,12 +27,12 @@ func NewRiotAPIService(apiKey string) *RiotAPIService {
 }
 
 // GetAccountByRiotID fetches account information by Riot ID
-func (r *RiotAPIService) GetAccountByRiotID(gameName, tagLine, region string) (*models.AccountInfo, error) {
+func (r *RiotAPIService) GetAccountByRiotID(ctx context.Context, gameName, tagLine, region string) (*models.AccountInfo, error) {
 	url := fmt.Sprintf("https://%s.api.riotgames.com/riot/account/v1/accounts/by-riot-id/%s/%s",
 		r.getRegionCluster(region), url.PathEscape(gameName), url.PathEscape(tagLine))
 
 	var account models.AccountInfo
-	err := r.makeRequest(url, &account)
+	err := r.makeRequest(ctx, url, &account)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get account: %w", err)
 	}
@@ -40,11 +41,11 @@ func (r *RiotAPIService) GetAccountByRiotID(gameName, tagLine, region string) (*
 }
 
 // GetSummonerByPUUID fetches summoner information by PUUID
-func (r *RiotAPIService) GetSummonerByPUUID(puuid, region string) (*models.SummonerInfo, error) {
+func (r *RiotAPIService) GetSummonerByPUUID(ctx context.Context, puuid, region string) (*models.SummonerInfo, error) {
 	url := fmt.Sprintf("https://%s.api.riotgames.com/lol/summoner/v4/summoners/by-puuid/%s", region, puuid)
 
 	var summoner models.SummonerInfo
-	err := r.makeRequest(url, &summoner)
+	err := r.makeRequest(ctx, url, &summoner)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get summoner: %w", err)
 	}
@@ -53,13 +54,13 @@ func (r *RiotAPIService) GetSummonerByPUUID(puuid, region string) (*models.Summo
 }
 
 // GetMatchList fetches recent matches for a summoner
-func (r *RiotAPIService) GetMatchList(puuid, region string, count int) ([]string, error) {
+func (r *RiotAPIService) GetMatchList(ctx context.Context, puuid, region string, count int) ([]string, error) {
 	regionCluster := r.getRegionCluster(region)
 	url := fmt.Sprintf("https://%s.api.riotgames.com/lol/match/v5/matches/by-puuid/%s/ids?start=0&count=%d",
 		regionCluster, puuid, count)
 
 	var matchIds []string
-	err := r.makeRequest(url, &matchIds)
+	err := r.makeRequest(ctx, url, &matchIds)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get match list: %w", err)
 	}
@@ -68,12 +69,12 @@ func (r *RiotAPIService) GetMatchList(puuid, region string, count int) ([]string
 }
 
 // GetMatch fetches detailed match information
-func (r *RiotAPIService) GetMatch(matchID, region string) (*models.MatchData, error) {
+func (r *RiotAPIService) GetMatch(ctx context.Context, matchID, region string) (*models.MatchData, error) {
 	regionCluster := r.getRegionCluster(region)
 	url := fmt.Sprintf("https://%s.api.riotgames.com/lol/match/v5/matches/%s", regionCluster, matchID)
 
 	var matchData models.MatchData
-	err := r.makeRequest(url, &matchData)
+	err := r.makeRequest(ctx, url, &matchData)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get match: %w", err)
 	}
@@ -82,12 +83,12 @@ func (r *RiotAPIService) GetMatch(matchID, region string) (*models.MatchData, er
 }
 
 // GetCurrentGameInfo fetches current game information for a summoner
-func (r *RiotAPIService) GetCurrentGameInfo(summonerID, region string) (*models.LiveGameInfo, error) {
+func (r *RiotAPIService) GetCurrentGameInfo(ctx context.Context, summonerID, region string) (*models.LiveGameInfo, error) {
 	url := fmt.Sprintf("https://%s.api.riotgames.com/lol/spectator/v4/active-games/by-summoner/%s",
 		region, summonerID)
 
 	var liveGame models.LiveGameInfo
-	err := r.makeRequest(url, &liveGame)
+	err := r.makeRequest(ctx, url, &liveGame)
 	if err != nil {
 		// If there's no active game, return nil without error
 		if err.Error() == "404" {
@@ -101,12 +102,12 @@ func (r *RiotAPIService) GetCurrentGameInfo(summonerID, region string) (*models.
 
 // GetCurrentGameByPUUID fetches live game data using the spectator v5 API with PUUID.
 // Returns the raw Riot API response as a generic map so no field mapping is needed.
-func (r *RiotAPIService) GetCurrentGameByPUUID(puuid, region string) (map[string]interface{}, error) {
+func (r *RiotAPIService) GetCurrentGameByPUUID(ctx context.Context, puuid, region string) (map[string]interface{}, error) {
 	url := fmt.Sprintf("https://%s.api.riotgames.com/lol/spectator/v5/active-games/by-summoner/%s",
 		region, puuid)
 
 	var gameData map[string]interface{}
-	if err := r.makeRequest(url, &gameData); err != nil {
+	if err := r.makeRequest(ctx, url, &gameData); err != nil {
 		return nil, err
 	}
 
@@ -115,12 +116,12 @@ func (r *RiotAPIService) GetCurrentGameByPUUID(puuid, region string) (map[string
 
 // GetLeagueEntriesByPUUID fetches ranked queue entries for a summoner by PUUID.
 // Uses the platform endpoint (e.g. na1.api.riotgames.com), not the regional cluster.
-func (r *RiotAPIService) GetLeagueEntriesByPUUID(puuid, region string) ([]models.LeagueEntry, error) {
+func (r *RiotAPIService) GetLeagueEntriesByPUUID(ctx context.Context, puuid, region string) ([]models.LeagueEntry, error) {
 	apiURL := fmt.Sprintf("https://%s.api.riotgames.com/lol/league/v4/entries/by-puuid/%s",
 		region, url.PathEscape(puuid))
 
 	var entries []models.LeagueEntry
-	if err := r.makeRequest(apiURL, &entries); err != nil {
+	if err := r.makeRequest(ctx, apiURL, &entries); err != nil {
 		return nil, fmt.Errorf("failed to get league entries: %w", err)
 	}
 
@@ -128,8 +129,8 @@ func (r *RiotAPIService) GetLeagueEntriesByPUUID(puuid, region string) ([]models
 }
 
 // makeRequest makes an HTTP request to the Riot API
-func (r *RiotAPIService) makeRequest(url string, dest interface{}) error {
-	req, err := http.NewRequest("GET", url, nil)
+func (r *RiotAPIService) makeRequest(ctx context.Context, url string, dest interface{}) error {
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
 		return err
 	}

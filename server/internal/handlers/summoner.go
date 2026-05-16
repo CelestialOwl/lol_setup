@@ -38,7 +38,7 @@ func (h *SummonerHandler) GetSummoner(c *gin.Context) {
 		return
 	}
 
-	response, err := h.summonerService.GetSummonerProfile(req.GameName, req.TagLine, req.Region)
+	response, err := h.summonerService.GetSummonerProfile(c.Request.Context(), req.GameName, req.TagLine, req.Region)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse{
 			Error:   "Failed to fetch summoner profile",
@@ -63,7 +63,7 @@ func (h *SummonerHandler) GetMatchHistory(c *gin.Context) {
 	}
 	region := c.DefaultQuery("region", "na1")
 
-	response, err := h.summonerService.GetMatchHistory(puuid, region)
+	response, err := h.summonerService.GetMatchHistory(c.Request.Context(), puuid, region)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse{
 			Error:   "Failed to fetch match history",
@@ -87,7 +87,7 @@ func (h *SummonerHandler) GetSummonerStats(c *gin.Context) {
 		return
 	}
 
-	stats, err := h.summonerService.GetSummonerStats(puuid)
+	stats, err := h.summonerService.GetSummonerStats(c.Request.Context(), puuid)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse{
 			Error:   "Failed to fetch summoner stats",
@@ -122,7 +122,7 @@ func (h *SummonerHandler) SearchSummoner(c *gin.Context) {
 		return
 	}
 
-	response, err := h.summonerService.GetSummonerProfile(req.GameName, req.TagLine, req.Region)
+	response, err := h.summonerService.GetSummonerProfile(c.Request.Context(), req.GameName, req.TagLine, req.Region)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse{
 			Error:   "Failed to fetch summoner profile",
@@ -147,7 +147,7 @@ func (h *SummonerHandler) GetRank(c *gin.Context) {
 		return
 	}
 
-	entries, err := h.summonerService.GetCachedRank(puuid)
+	entries, err := h.summonerService.GetCachedRank(c.Request.Context(), puuid)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse{
 			Error:   "Failed to fetch rank",
@@ -175,7 +175,7 @@ func (h *SummonerHandler) GetRankHistory(c *gin.Context) {
 
 	queueType := c.DefaultQuery("queueType", "RANKED_SOLO_5x5")
 
-	snapshots, err := h.summonerService.GetRankHistory(puuid, queueType)
+	snapshots, err := h.summonerService.GetRankHistory(c.Request.Context(), puuid, queueType)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse{
 			Error:   "Failed to fetch rank history",

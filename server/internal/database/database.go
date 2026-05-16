@@ -1,6 +1,7 @@
 package database
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"log"
@@ -55,6 +56,16 @@ func (db *DB) Query(query string, args ...interface{}) (*sql.Rows, error) {
 	return rows, err
 }
 
+// QueryContext executes a query with context and returns rows.
+func (db *DB) QueryContext(ctx context.Context, query string, args ...interface{}) (*sql.Rows, error) {
+	start := time.Now()
+	rows, err := db.DB.QueryContext(ctx, query, args...)
+	duration := time.Since(start)
+
+	log.Printf("QueryContext executed in %v: %s", duration, query)
+	return rows, err
+}
+
 // QueryRow executes a query that returns a single row
 func (db *DB) QueryRow(query string, args ...interface{}) *sql.Row {
 	start := time.Now()
@@ -65,6 +76,16 @@ func (db *DB) QueryRow(query string, args ...interface{}) *sql.Row {
 	return row
 }
 
+// QueryRowContext executes a query with context that returns a single row.
+func (db *DB) QueryRowContext(ctx context.Context, query string, args ...interface{}) *sql.Row {
+	start := time.Now()
+	row := db.DB.QueryRowContext(ctx, query, args...)
+	duration := time.Since(start)
+
+	log.Printf("QueryRowContext executed in %v: %s", duration, query)
+	return row
+}
+
 // Exec executes a query without returning rows
 func (db *DB) Exec(query string, args ...interface{}) (sql.Result, error) {
 	start := time.Now()
@@ -72,5 +93,15 @@ func (db *DB) Exec(query string, args ...interface{}) (sql.Result, error) {
 	duration := time.Since(start)
 
 	log.Printf("Exec executed in %v: %s", duration, query)
+	return result, err
+}
+
+// ExecContext executes a query with context without returning rows.
+func (db *DB) ExecContext(ctx context.Context, query string, args ...interface{}) (sql.Result, error) {
+	start := time.Now()
+	result, err := db.DB.ExecContext(ctx, query, args...)
+	duration := time.Since(start)
+
+	log.Printf("ExecContext executed in %v: %s", duration, query)
 	return result, err
 }

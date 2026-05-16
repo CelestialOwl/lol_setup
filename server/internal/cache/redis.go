@@ -20,7 +20,6 @@ var ErrCacheMiss = errors.New("cache miss")
 
 type RedisClient struct {
 	client *redis.Client
-	ctx    context.Context
 }
 
 func NewRedisClient(cfg *config.Config) (*RedisClient, error) {
@@ -30,7 +29,8 @@ func NewRedisClient(cfg *config.Config) (*RedisClient, error) {
 		DB:       0,
 	})
 
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
 
 	// Test connection
 	_, err := rdb.Ping(ctx).Result()
@@ -41,27 +41,26 @@ func NewRedisClient(cfg *config.Config) (*RedisClient, error) {
 	slog.Info("connected to Redis", "addr", cfg.RedisURL)
 	return &RedisClient{
 		client: rdb,
-		ctx:    ctx,
 	}, nil
 }
 
 // Ping checks the Redis connection. Used by the health endpoint.
-func (r *RedisClient) Ping() error {
-	_, err := r.client.Ping(r.ctx).Result()
+func (r *RedisClient) Ping(ctx context.Context) error {
+	_, err := r.client.Ping(ctx).Result()
 	return err
 }
 
-func (r *RedisClient) Set(key string, value interface{}, ttl time.Duration) error {
+func (r *RedisClient) Set(ctx context.Context, key string, value interface{}, ttl time.Duration) error {
 	jsonData, err := json.Marshal(value)
 	if err != nil {
 		return fmt.Errorf("failed to marshal value: %w", err)
 	}
 
-	return r.client.Set(r.ctx, key, jsonData, ttl).Err()
+	return r.client.Set(ctx, key, jsonData, ttl).Err()
 }
 
-func (r *RedisClient) Get(key string, dest interface{}) error {
-	val, err := r.client.Get(r.ctx, key).Result()
+func (r *RedisClient) Get(ctx context.Context, key string, dest interface{}) error {
+	val, err := r.client.Get(ctx, key).Result()
 	if err != nil {
 		if err == redis.Nil {
 			return ErrCacheMiss
@@ -72,16 +71,16 @@ func (r *RedisClient) Get(key string, dest interface{}) error {
 	return json.Unmarshal([]byte(val), dest)
 }
 
-func (r *RedisClient) Delete(key string) error {
-	return r.client.Del(r.ctx, key).Err()
+func (r *RedisClient) Delete(ctx context.Context, key string) error {
+	return r.client.Del(ctx, key).Err()
 }
 
-func (r *RedisClient) Exists(key string) (bool, error) {
-	result, err := r.client.Exists(r.ctx, key).Result()
+func (r *RedisClient) Exists(ctx context.Context, key string) (bool, error) {
+	result, err := r.client.Exists(ctx, key).Result()
 	return result > 0, err
 }
 
-func (r *RedisClient) SetHash(key string, fields map[string]interface{}, ttl time.Duration) error {
+func (r *RedisClient) SetHash(ctx context.Context, key string, fields map[string]interface{}, ttl time.Duration) error {
 	pipe := r.client.Pipeline()
 
 	for field, value := range fields {
@@ -89,19 +88,19 @@ func (r *RedisClient) SetHash(key string, fields map[string]interface{}, ttl tim
 		if err != nil {
 			return fmt.Errorf("failed to marshal field %s: %w", field, err)
 		}
-		pipe.HSet(r.ctx, key, field, jsonData)
+		pipe.HSet(ctx, key, field, jsonData)
 	}
 
 	if ttl > 0 {
-		pipe.Expire(r.ctx, key, ttl)
+		pipe.Expire(ctx, key, ttl)
 	}
 
-	_, err := pipe.Exec(r.ctx)
+	_, err := pipe.Exec(ctx)
 	return err
 }
 
-func (r *RedisClient) GetHash(key, field string, dest interface{}) error {
-	val, err := r.client.HGet(r.ctx, key, field).Result()
+func (r *RedisClient) GetHash(ctx context.Context, key, field string, dest interface{}) error {
+	val, err := r.client.HGet(ctx, key, field).Result()
 	if err != nil {
 		if err == redis.Nil {
 			return ErrCacheMiss

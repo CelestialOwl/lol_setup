@@ -81,7 +81,7 @@ func main() {
 			})
 			return
 		}
-		if err := redisClient.Ping(); err != nil {
+		if err := redisClient.Ping(c.Request.Context()); err != nil {
 			c.JSON(http.StatusServiceUnavailable, gin.H{
 				"status": "degraded",
 				"redis":  "unhealthy",
