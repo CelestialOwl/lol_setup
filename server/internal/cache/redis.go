@@ -11,6 +11,7 @@ import (
 	"lol-match-tracker/internal/config"
 	"lol-match-tracker/internal/metrics"
 
+	"github.com/go-redis/redis/extra/redisotel/v8"
 	"github.com/go-redis/redis/v8"
 )
 
@@ -40,6 +41,10 @@ func NewRedisClient(cfg *config.Config) (*RedisClient, error) {
 	}
 
 	slog.Info("connected to Redis", "addr", cfg.RedisURL)
+
+	// Attach OpenTelemetry tracing hook — auto-creates spans for every Redis command.
+	rdb.AddHook(redisotel.NewTracingHook())
+
 	return &RedisClient{
 		client: rdb,
 	}, nil

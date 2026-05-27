@@ -42,11 +42,22 @@ services:
       - REDIS_URL=redis:6379
       - RIOT_API_KEY=${RIOT_API_KEY}
       - GIN_MODE=release
+      - OTEL_ENDPOINT=jaeger:4318
+      - OTEL_SERVICE_NAME=lol-match-tracker-api
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
+
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    ports:
+      - "16686:16686" # Jaeger UI
+      - "4318:4318"   # OTLP HTTP receiver
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
+    restart: unless-stopped
 
   prometheus:
     image: prom/prometheus:v2.54.1

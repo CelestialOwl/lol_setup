@@ -36,6 +36,12 @@ type Config struct {
 	SummonerCacheTTL int
 	MatchCacheTTL    int
 	LiveGameCacheTTL int
+
+	// Observability — OpenTelemetry
+	// OtelEndpoint is the OTLP/HTTP receiver URL, e.g. http://jaeger:4318
+	// Leave empty to disable tracing (uses a no-op provider).
+	OtelEndpoint    string
+	OtelServiceName string
 }
 
 func Load() *Config {
@@ -70,6 +76,10 @@ func Load() *Config {
 		SummonerCacheTTL: getEnvAsInt("SUMMONER_CACHE_TTL", 300),
 		MatchCacheTTL:    getEnvAsInt("MATCH_CACHE_TTL", 900),
 		LiveGameCacheTTL: getEnvAsInt("LIVE_GAME_CACHE_TTL", 60),
+
+		// Observability
+		OtelEndpoint:    getEnv("OTEL_ENDPOINT", ""),
+		OtelServiceName: getEnv("OTEL_SERVICE_NAME", "lol-match-tracker-api"),
 	}
 }
 

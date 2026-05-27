@@ -12,6 +12,10 @@ import (
 
 	"lol-match-tracker/internal/metrics"
 	"lol-match-tracker/internal/models"
+
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
 )
 
 type RiotAPIService struct {
@@ -132,8 +136,17 @@ func (r *RiotAPIService) GetLeagueEntriesByPUUID(ctx context.Context, puuid, reg
 
 // makeRequest makes an authenticated GET request to the Riot API, records
 // Prometheus metrics (call count by endpoint+status, latency by endpoint),
-// and decodes the JSON response body into dest.
+// emits an OTel span, and decodes the JSON response body into dest.
 func (r *RiotAPIService) makeRequest(ctx context.Context, endpoint, url string, dest interface{}) error {
+	tracer := otel.Tracer("lol-match-tracker/riot_api")
+	ctx, span := tracer.Start(ctx, "riot_api."+endpoint)
+	defer span.End()
+
+	span.SetAttributes(
+		attribute.String("riot.endpoint", endpoint),
+		attribute.String("http.url", url),
+	)
+
 	start := time.Now()
 
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
@@ -150,16 +163,21 @@ func (r *RiotAPIService) makeRequest(ctx context.Context, endpoint, url string, 
 
 	if err != nil {
 		metrics.RiotAPICallsTotal.WithLabelValues(endpoint, "error").Inc()
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		return err
 	}
 	defer resp.Body.Close()
 
 	statusStr := strconv.Itoa(resp.StatusCode)
 	metrics.RiotAPICallsTotal.WithLabelValues(endpoint, statusStr).Inc()
+	span.SetAttributes(attribute.Int("http.status_code", resp.StatusCode))
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("%d: %s", resp.StatusCode, string(body))
+		errMsg := fmt.Sprintf("%d: %s", resp.StatusCode, string(body))
+		span.SetStatus(codes.Error, errMsg)
+		return fmt.Errorf("%s", errMsg)
 	}
 
 	body, err := io.ReadAll(resp.Body)

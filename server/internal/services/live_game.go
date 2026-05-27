@@ -7,6 +7,10 @@ import (
 	"strings"
 
 	"lol-match-tracker/internal/interfaces"
+
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
 )
 
 // ErrNotInGame is returned when the player is not currently in an active game.
@@ -25,11 +29,22 @@ func NewLiveGameService(riotAPI interfaces.RiotClient) *LiveGameService {
 //
 //	{ gameInfo, playerTeam, enemyTeam, searchedPlayer, inGame: true }
 func (s *LiveGameService) GetLiveGame(ctx context.Context, gameName, tagLine, region string) (map[string]interface{}, error) {
+	tracer := otel.Tracer("lol-match-tracker/services")
+	ctx, span := tracer.Start(ctx, "service.GetLiveGame")
+	span.SetAttributes(
+		attribute.String("summoner.game_name", gameName),
+		attribute.String("summoner.tag_line", tagLine),
+		attribute.String("summoner.region", region),
+	)
+	defer span.End()
+
 	riotCtx, cancel := withTimeout(ctx, riotTimeout)
 	defer cancel()
 
 	account, err := s.riotAPI.GetAccountByRiotID(riotCtx, gameName, tagLine, region)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		return nil, fmt.Errorf("failed to get account: %w", err)
 	}
 

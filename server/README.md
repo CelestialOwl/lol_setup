@@ -307,7 +307,65 @@ go test -coverprofile=coverage.out ./...
 go tool cover -html=coverage.out
 ```
 
-## 📝 API Response Examples
+## � Observability & Monitoring
+
+The application includes comprehensive observability with distributed tracing, metrics, and monitoring dashboards.
+
+### Services Overview
+
+| Service | Port | URL | Description |
+|---------|------|-----|-------------|
+| **Jaeger UI (Fixed)** | 8686 | http://localhost:8686 | **Use this** - Distributed tracing with CSS fixes |
+| Jaeger UI (Original) | 16686 | http://localhost:16686 | Original UI (has contrast issues) |
+| Prometheus | 9090 | http://localhost:9090 | Metrics collection |
+| Grafana | 3030 | http://localhost:3030 | Monitoring dashboards |
+
+### Jaeger Distributed Tracing
+
+**⚠️ Use Port 8686 for Better UI Experience**
+
+The Jaeger UI at port **8686** includes CSS fixes for better readability (dark text on light backgrounds). The original UI at port 16686 has contrast issues with white text on white backgrounds.
+
+**Features:**
+- Trace requests across services
+- Identify performance bottlenecks
+- Debug slow database queries
+- Monitor Redis cache hits/misses
+- Track external Riot API calls
+
+**Quick Start:**
+1. Open http://localhost:8686
+2. Select service: `lol-match-tracker-api`
+3. Click "Find Traces"
+4. View trace details and span timings
+
+### Prometheus Metrics
+
+Access metrics at http://localhost:9090
+
+**Available Metrics:**
+- HTTP request durations
+- Request counts by endpoint
+- Cache hit/miss rates
+- Database query performance
+- Redis operation latencies
+
+### Grafana Dashboards
+
+Access dashboards at http://localhost:3030
+
+**Default Credentials:**
+- Username: `admin`
+- Password: `admin`
+
+**Pre-configured Dashboard:**
+- Service health overview
+- Request rate and latency
+- Cache performance
+- Database metrics
+- Error rates
+
+## �📝 API Response Examples
 
 ### Summoner Data Response
 ```json

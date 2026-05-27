@@ -96,7 +96,7 @@ This file is the persisted roadmap for future reference.
 - Expose `/metrics`.
 - Pre-built Grafana dashboard: cache hit rate, resolution breakdown, Riot API RPM/RPH/RPD, DB latency.
 
-### 3.2 Tracing with OpenTelemetry + Jaeger
+### 3.2 Tracing with OpenTelemetry + Jaeger ✅
 - Add spans across handlers/services/repos/cache/Riot HTTP calls.
 - Ensure trace context propagation through request chain.
 

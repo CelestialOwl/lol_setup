@@ -10,6 +10,10 @@ import (
 	"lol-match-tracker/internal/interfaces"
 	"lol-match-tracker/internal/metrics"
 	"lol-match-tracker/internal/models"
+
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
 )
 
 type SummonerService struct {
@@ -40,6 +44,15 @@ func NewSummonerService(
 // It checks Redis → Postgres → Riot API and is a fast 2-call path.
 // On every live fetch it also retrieves and stores the player's rank.
 func (s *SummonerService) GetSummonerProfile(ctx context.Context, gameName, tagLine, region string) (*models.SummonerProfileResponse, error) {
+	tracer := otel.Tracer("lol-match-tracker/services")
+	ctx, span := tracer.Start(ctx, "service.GetSummonerProfile")
+	span.SetAttributes(
+		attribute.String("summoner.game_name", gameName),
+		attribute.String("summoner.tag_line", tagLine),
+		attribute.String("summoner.region", region),
+	)
+	defer span.End()
+
 	cacheKey := fmt.Sprintf("profile:%s:%s:%s", region, gameName, tagLine)
 
 	// 1. Redis cache
@@ -98,6 +111,8 @@ func (s *SummonerService) GetSummonerProfile(ctx context.Context, gameName, tagL
 	account, err := s.riotAPI.GetAccountByRiotID(riotCtx, gameName, tagLine, region)
 	riotCancel()
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		return nil, fmt.Errorf("failed to get account: %w", err)
 	}
 	riotCtx, riotCancel = withTimeout(ctx, riotTimeout)
@@ -140,6 +155,14 @@ func (s *SummonerService) GetSummonerProfile(ctx context.Context, gameName, tagL
 // The response includes a Ranks map with the latest solo rank from DB for every
 // participant that has one — no live Riot API call is made for other players.
 func (s *SummonerService) GetMatchHistory(ctx context.Context, puuid, region string) (*models.MatchHistoryResponse, error) {
+	tracer := otel.Tracer("lol-match-tracker/services")
+	ctx, span := tracer.Start(ctx, "service.GetMatchHistory")
+	span.SetAttributes(
+		attribute.String("summoner.puuid", puuid),
+		attribute.String("summoner.region", region),
+	)
+	defer span.End()
+
 	cacheKey := fmt.Sprintf("matches:%s:%s", region, puuid)
 
 	// 1. Redis cache

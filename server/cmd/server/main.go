@@ -17,15 +17,29 @@ import (
 	"lol-match-tracker/internal/middleware"
 	"lol-match-tracker/internal/repository"
 	"lol-match-tracker/internal/services"
+	"lol-match-tracker/internal/tracing"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
 )
 
 func main() {
 	// Load configuration
 	cfg := config.Load()
+
+	// Initialise OpenTelemetry tracing (no-op when OTEL_ENDPOINT is unset)
+	tracingShutdown, err := tracing.Init(context.Background(), cfg.OtelEndpoint, cfg.OtelServiceName)
+	if err != nil {
+		slog.Error("failed to initialise tracing", "error", err)
+		os.Exit(1)
+	}
+	defer func() {
+		if err := tracingShutdown(context.Background()); err != nil {
+			slog.Error("tracing shutdown error", "error", err)
+		}
+	}()
 
 	// Configure structured logger
 	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
@@ -69,6 +83,7 @@ func main() {
 
 	// Middleware
 	router.Use(middleware.RequestID())
+	router.Use(otelgin.Middleware(cfg.OtelServiceName)) // must be before Logger so span is active
 	router.Use(middleware.Logger())
 	router.Use(middleware.ErrorHandler())
 	router.Use(cors.New(cors.Config{

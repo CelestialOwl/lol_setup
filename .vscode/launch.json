@@ -5,6 +5,7 @@
             "name": "Client: Next.js + Chrome",
             "type": "node",
             "request": "launch",
+            "runtimeExecutable": "/Users/hasan.akhtar/.nvm/versions/node/v20.18.3/bin/node",
             "program": "${workspaceFolder}/client/node_modules/next/dist/bin/next",
             "args": ["dev"],
             "cwd": "${workspaceFolder}/client",
