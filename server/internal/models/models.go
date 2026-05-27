@@ -176,7 +176,7 @@ type LiveParticipant struct {
 type SearchRequest struct {
 	GameName string `json:"gameName" validate:"required,min=1,max=16"`
 	TagLine  string `json:"tagLine" validate:"required,min=1,max=5"`
-	Region   string `json:"region" validate:"required,oneof=na1 euw1 eun1 kr oc1 jp1 br1 las lan1 tr1 ru"`
+	Region   string `json:"region" validate:"required,oneof=na1 euw1 eun1 kr oc1 jp1 br1 las lan1 tr1 ru me1"`
 }
 
 // ErrorResponse represents an API error response

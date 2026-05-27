@@ -71,7 +71,16 @@ func main() {
 
 	// Initialize services
 	riotAPIService := services.NewRiotAPIService(cfg.RiotAPIKey)
-	summonerService := services.NewSummonerService(summonerRepo, matchRepo, riotAPIService, redisClient, cfg)
+
+	// Background rank-fetch worker — rate-limited, best-effort
+	workerCtx, workerCancel := context.WithCancel(context.Background())
+	defer workerCancel()
+	rankWorker := services.NewRankFetchWorker(riotAPIService, summonerRepo, cfg.RankWorkerRPM)
+	rankWorker.Start(workerCtx)
+	defer rankWorker.Stop()
+
+	summonerService := services.NewSummonerService(summonerRepo, matchRepo, riotAPIService, redisClient, cfg).
+		WithRankWorker(rankWorker)
 	liveGameService := services.NewLiveGameService(riotAPIService)
 
 	// Initialize handlers

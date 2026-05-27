@@ -42,6 +42,11 @@ type Config struct {
 	// Leave empty to disable tracing (uses a no-op provider).
 	OtelEndpoint    string
 	OtelServiceName string
+
+	// Background worker
+	// RankWorkerRPM controls how many Riot rank-API calls the background
+	// worker makes per minute. Defaults to 10 (one every 6 s).
+	RankWorkerRPM int
 }
 
 func Load() *Config {
@@ -80,6 +85,9 @@ func Load() *Config {
 		// Observability
 		OtelEndpoint:    getEnv("OTEL_ENDPOINT", ""),
 		OtelServiceName: getEnv("OTEL_SERVICE_NAME", "lol-match-tracker-api"),
+
+		// Background worker
+		RankWorkerRPM: getEnvAsInt("RANK_WORKER_RPM", 40),
 	}
 }
 

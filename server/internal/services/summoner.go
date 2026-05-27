@@ -22,6 +22,7 @@ type SummonerService struct {
 	riotAPI      interfaces.RiotClient
 	cache        interfaces.Cache
 	config       *config.Config
+	rankWorker   *RankFetchWorker
 }
 
 func NewSummonerService(
@@ -38,6 +39,13 @@ func NewSummonerService(
 		cache:        cache,
 		config:       config,
 	}
+}
+
+// WithRankWorker attaches a background rank-fetch worker to the service.
+// Call this once after construction; existing tests that pass no worker are unaffected.
+func (s *SummonerService) WithRankWorker(w *RankFetchWorker) *SummonerService {
+	s.rankWorker = w
+	return s
 }
 
 // GetSummonerProfile fetches account + summoner info only (no matches).
@@ -335,6 +343,9 @@ func (s *SummonerService) storeMatchData(ctx context.Context, matchesData []mode
 						slog.Warn("failed to upsert participant summoner", "puuid", puuid, "error", err)
 					}
 					cancel()
+					if s.rankWorker != nil {
+						s.rankWorker.Enqueue(RankFetchTask{PUUID: puuid, Region: region})
+					}
 				}
 
 				pModels = append(pModels, models.Participant{

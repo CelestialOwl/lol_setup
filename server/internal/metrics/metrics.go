@@ -105,6 +105,36 @@ var ResolutionTotal = prometheus.NewCounterVec(
 	[]string{"operation", "source"},
 )
 
+// ── Background rank-fetch worker ─────────────────────────────────────────────
+
+// RankWorkerQueueDepth tracks the number of tasks currently sitting in the
+// worker's buffered channel. Use Inc/Dec when enqueuing/dequeuing.
+var RankWorkerQueueDepth = prometheus.NewGauge(
+	prometheus.GaugeOpts{
+		Name: "rank_worker_queue_depth",
+		Help: "Number of rank-fetch tasks currently queued.",
+	},
+)
+
+// RankWorkerTasksTotal counts tasks that were fully processed by the worker.
+// result label values: "success", "failed"
+var RankWorkerTasksTotal = prometheus.NewCounterVec(
+	prometheus.CounterOpts{
+		Name: "rank_worker_tasks_total",
+		Help: "Total rank-fetch tasks processed by the background worker.",
+	},
+	[]string{"result"},
+)
+
+// RankWorkerTasksDropped counts tasks discarded because the queue was full
+// or the PUUID was already pending.
+var RankWorkerTasksDropped = prometheus.NewCounter(
+	prometheus.CounterOpts{
+		Name: "rank_worker_tasks_dropped_total",
+		Help: "Total rank-fetch tasks dropped (queue full or duplicate PUUID).",
+	},
+)
+
 // init registers all metrics with the default Prometheus registry.
 // This runs automatically when any package imports lol-match-tracker/internal/metrics.
 func init() {
@@ -117,5 +147,8 @@ func init() {
 		RiotAPICallsTotal,
 		RiotAPIDuration,
 		ResolutionTotal,
+		RankWorkerQueueDepth,
+		RankWorkerTasksTotal,
+		RankWorkerTasksDropped,
 	)
 }

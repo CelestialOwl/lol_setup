@@ -199,6 +199,7 @@ func (r *RiotAPIService) getRegionCluster(region string) string {
 		"eun1": "europe",
 		"tr1":  "europe",
 		"ru":   "europe",
+		"me1":  "europe",
 		"kr":   "asia",
 		"jp1":  "asia",
 		"oc1":  "sea",
