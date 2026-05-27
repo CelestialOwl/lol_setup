@@ -133,11 +133,6 @@ export default function MatchCard({
         </div>
 
         <div className="space-y-2 lg:col-span-3">
-          <div className="flex items-center justify-between">
-            <h4 className="text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-              Allies
-            </h4>
-          </div>
           <div className="space-y-2">
             {match.allies.map((participant) => (
               <RosterRow
@@ -150,11 +145,6 @@ export default function MatchCard({
         </div>
 
         <div className="space-y-2 lg:col-span-3">
-          <div className="flex items-center justify-between">
-            <h4 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
-              Enemies
-            </h4>
-          </div>
           <div className="space-y-2">
             {match.enemies.map((participant) => (
               <RosterRow

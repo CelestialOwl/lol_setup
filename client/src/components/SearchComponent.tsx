@@ -9,32 +9,44 @@ interface SearchComponentProps {
 }
 
 export default function SearchComponent({ onSearch, loading }: SearchComponentProps) {
-  const [formData, setFormData] = useState<SearchFormData>({
-    gameName: '',
-    tagLine: '',
-    region: 'na1'
-  });
+  const [searchInput, setSearchInput] = useState('');
+  const [region, setRegion] = useState('euw1');
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (formData.gameName.trim() && formData.tagLine.trim()) {
-      onSearch(formData);
+    const trimmed = searchInput.trim();
+    if (!trimmed) return;
+
+    let gameName: string;
+    let tagLine: string;
+
+    if (trimmed.includes('#')) {
+      const parts = trimmed.split('#');
+      gameName = parts[0].trim();
+      tagLine = parts.slice(1).join('#').trim();
+    } else {
+      gameName = trimmed;
+      tagLine = region === 'euw1' ? 'EUW' : region === 'na1' ? 'NA1' : region.toUpperCase();
+    }
+
+    if (gameName && tagLine) {
+      onSearch({ gameName, tagLine, region });
     }
   };
 
   const regions = [
-    { value: 'na1', label: 'North America' },
-    { value: 'euw1', label: 'Europe West' },
-    { value: 'eun1', label: 'Europe Nordic & East' },
-    { value: 'kr', label: 'Korea' },
-    { value: 'jp1', label: 'Japan' },
-    { value: 'br1', label: 'Brazil' },
-    { value: 'la1', label: 'Latin America North' },
-    { value: 'la2', label: 'Latin America South' },
-    { value: 'oc1', label: 'Oceania' },
-    { value: 'tr1', label: 'Turkey' },
-    { value: 'ru', label: 'Russia' },
-    { value: 'me1', label: 'Middle East' }
+    { value: 'euw1', label: 'EUW' },
+    { value: 'na1', label: 'NA' },
+    { value: 'eun1', label: 'EUNE' },
+    { value: 'kr', label: 'KR' },
+    { value: 'jp1', label: 'JP' },
+    { value: 'br1', label: 'BR' },
+    { value: 'la1', label: 'LAN' },
+    { value: 'la2', label: 'LAS' },
+    { value: 'oc1', label: 'OCE' },
+    { value: 'tr1', label: 'TR' },
+    { value: 'ru', label: 'RU' },
+    { value: 'me1', label: 'ME' }
   ];
 
   return (
@@ -44,60 +56,44 @@ export default function SearchComponent({ onSearch, loading }: SearchComponentPr
       </h1>
       
       <form onSubmit={handleSubmit} className="space-y-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label htmlFor="gameName" className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2">
-              Summoner Name
-            </label>
-            <input
-              type="text"
-              id="gameName"
-              value={formData.gameName}
-              onChange={(e) => setFormData({ ...formData, gameName: e.target.value })}
-              placeholder="e.g., Hide on bush"
-              className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-800 text-gray-900 dark:text-slate-100 placeholder-gray-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              disabled={loading}
-            />
-          </div>
-          
-          <div>
-            <label htmlFor="tagLine" className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2">
-              Tag Line
-            </label>
-            <input
-              type="text"
-              id="tagLine"
-              value={formData.tagLine}
-              onChange={(e) => setFormData({ ...formData, tagLine: e.target.value })}
-              placeholder="e.g., KR1"
-              className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-800 text-gray-900 dark:text-slate-100 placeholder-gray-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              disabled={loading}
-            />
-          </div>
-        </div>
-
-        <div>
+        <div className="flex gap-3 items-end">
+                    <div className="w-24">
             <label htmlFor="region" className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2">
-            Region
-          </label>
-          <select
-            id="region"
-            value={formData.region}
-            onChange={(e) => setFormData({ ...formData, region: e.target.value })}
-            className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-800 text-gray-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            disabled={loading}
-          >
-            {regions.map((region) => (
-              <option key={region.value} value={region.value}>
-                {region.label}
-              </option>
-            ))}
-          </select>
+              Region
+            </label>
+            <select
+              id="region"
+              value={region}
+              onChange={(e) => setRegion(e.target.value)}
+              className="w-full px-2 py-2 border border-gray-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-800 text-gray-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              disabled={loading}
+            >
+              {regions.map((r) => (
+                <option key={r.value} value={r.value}>
+                  {r.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="flex-1">
+            <label htmlFor="searchInput" className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2">
+              Summoner
+            </label>
+            <input
+              type="text"
+              id="searchInput"
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              placeholder="Name#Tag (e.g. Faker#KR1)"
+              className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-800 text-gray-900 dark:text-slate-100 placeholder-gray-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              disabled={loading}
+            />
+          </div>
         </div>
 
         <button
           type="submit"
-          disabled={loading || !formData.gameName.trim() || !formData.tagLine.trim()}
+          disabled={loading || !searchInput.trim()}
           className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
         >
           {loading ? (
@@ -106,15 +102,10 @@ export default function SearchComponent({ onSearch, loading }: SearchComponentPr
               Searching...
             </div>
           ) : (
-            'Search Matches'
+            'Search'
           )}
         </button>
       </form>
-
-      <div className="mt-4 text-sm text-gray-600 dark:text-slate-400 text-center">
-        <p>Enter your summoner name and tag (e.g., &quot;Hide on bush&quot; and &quot;KR1&quot;)</p>
-        <p>Make sure to select the correct region for accurate results</p>
-      </div>
     </div>
   );
 }

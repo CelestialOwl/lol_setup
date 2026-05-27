@@ -36,6 +36,9 @@ export default function RosterRow({
           <div className="flex items-center gap-1">
             <span className="truncate text-sm font-medium text-slate-800 dark:text-slate-100">
               {participant.gameName}
+              {participant.tagLine && (
+                <span className="text-slate-400 dark:text-slate-500">#{participant.tagLine}</span>
+              )}
             </span>
             {participant.isPlayer ? (
               <span className="rounded-full bg-blue-100 dark:bg-blue-900/40 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-blue-700 dark:text-blue-300">
