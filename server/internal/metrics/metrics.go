@@ -135,6 +135,16 @@ var RankWorkerTasksDropped = prometheus.NewCounter(
 	},
 )
 
+// ── Rate limiting ─────────────────────────────────────────────────────────────
+
+// RateLimitRejectedTotal counts requests rejected due to per-IP rate limiting.
+var RateLimitRejectedTotal = prometheus.NewCounter(
+	prometheus.CounterOpts{
+		Name: "rate_limit_rejected_total",
+		Help: "Total requests rejected by the per-IP rate limiter (HTTP 429).",
+	},
+)
+
 // init registers all metrics with the default Prometheus registry.
 // This runs automatically when any package imports lol-match-tracker/internal/metrics.
 func init() {
@@ -150,5 +160,6 @@ func init() {
 		RankWorkerQueueDepth,
 		RankWorkerTasksTotal,
 		RankWorkerTasksDropped,
+		RateLimitRejectedTotal,
 	)
 }

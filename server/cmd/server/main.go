@@ -92,6 +92,9 @@ func main() {
 
 	// Middleware
 	router.Use(middleware.RequestID())
+	rateLimiter := middleware.NewIPRateLimiter(cfg.RateLimitRPS, cfg.RateLimitBurst)
+	defer rateLimiter.Stop()
+	router.Use(rateLimiter.RateLimit())
 	router.Use(otelgin.Middleware(cfg.OtelServiceName)) // must be before Logger so span is active
 	router.Use(middleware.Logger())
 	router.Use(middleware.ErrorHandler())
