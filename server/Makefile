@@ -133,9 +133,32 @@ migrate-drop:
 build-linux:
 	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 $(GOBUILD) -o $(BINARY)_unix -v ./cmd/server
 
+# ── Load testing (k6) ─────────────────────────────────────────────────────────
+# Install k6: brew install k6
+# Override the target summoner:
+#   make loadtest-smoke GAME_NAME=Faker TAG_LINE=KR1 REGION=kr
+K6_BASE_URL ?= http://localhost:8080
+K6_GAME_NAME ?= bro
+K6_TAG_LINE  ?= han
+K6_REGION    ?= euw1
+K6_ENV = -e BASE_URL=$(K6_BASE_URL) -e GAME_NAME=$(K6_GAME_NAME) -e TAG_LINE=$(K6_TAG_LINE) -e REGION=$(K6_REGION)
+
+loadtest-smoke:
+	@which k6 > /dev/null 2>&1 || (echo "k6 not installed. Run: brew install k6" && exit 1)
+	k6 run $(K6_ENV) loadtest/smoke.js
+
+loadtest-load:
+	@which k6 > /dev/null 2>&1 || (echo "k6 not installed. Run: brew install k6" && exit 1)
+	k6 run $(K6_ENV) loadtest/load.js
+
+loadtest-stress:
+	@which k6 > /dev/null 2>&1 || (echo "k6 not installed. Run: brew install k6" && exit 1)
+	k6 run $(K6_ENV) loadtest/stress.js
+
 .PHONY: all build test clean deps fmt vet \
 	dev-local dev-docker debug-docker-up debug-docker-down install-air \
         docker-build docker-stop docker-clean \
         db-up db-down \
         migrate-install migrate-up migrate-down migrate-status migrate-drop \
-        build-linux
+        build-linux \
+        loadtest-smoke loadtest-load loadtest-stress
