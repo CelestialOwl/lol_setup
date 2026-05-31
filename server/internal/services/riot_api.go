@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -13,6 +14,7 @@ import (
 	"lol-match-tracker/internal/metrics"
 	"lol-match-tracker/internal/models"
 
+	"github.com/sony/gobreaker/v2"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
@@ -21,14 +23,31 @@ import (
 type RiotAPIService struct {
 	apiKey     string
 	httpClient *http.Client
+	cb         *gobreaker.CircuitBreaker[*http.Response]
 }
 
 func NewRiotAPIService(apiKey string) *RiotAPIService {
+	cb := gobreaker.NewCircuitBreaker[*http.Response](gobreaker.Settings{
+		Name:        "riot-api",
+		MaxRequests: 2,                // allow 2 probe requests in half-open state
+		Interval:    60 * time.Second, // reset failure counts every 60s in closed state
+		Timeout:     30 * time.Second, // stay open for 30s before moving to half-open
+		ReadyToTrip: func(counts gobreaker.Counts) bool {
+			// Trip after 5 consecutive failures
+			return counts.ConsecutiveFailures >= 5
+		},
+		OnStateChange: func(name string, from gobreaker.State, to gobreaker.State) {
+			slog.Warn("circuit breaker state change", "name", name, "from", from.String(), "to", to.String())
+			metrics.CircuitBreakerState.WithLabelValues(name).Set(float64(to))
+		},
+	})
+
 	return &RiotAPIService{
 		apiKey: apiKey,
 		httpClient: &http.Client{
 			Timeout: 10 * time.Second,
 		},
+		cb: cb,
 	}
 }
 
@@ -157,15 +176,27 @@ func (r *RiotAPIService) makeRequest(ctx context.Context, endpoint, url string, 
 	req.Header.Set("X-Riot-Token", r.apiKey)
 	req.Header.Set("Content-Type", "application/json")
 
-	resp, err := r.httpClient.Do(req)
+	resp, cbErr := r.cb.Execute(func() (*http.Response, error) {
+		res, err := r.httpClient.Do(req)
+		if err != nil {
+			return nil, err
+		}
+		// Treat 5xx and 429 as failures that should trip the breaker
+		if res.StatusCode >= 500 || res.StatusCode == 429 {
+			body, _ := io.ReadAll(res.Body)
+			res.Body.Close()
+			return nil, fmt.Errorf("%d: %s", res.StatusCode, string(body))
+		}
+		return res, nil
+	})
 	duration := time.Since(start)
 	metrics.RiotAPIDuration.WithLabelValues(endpoint).Observe(duration.Seconds())
 
-	if err != nil {
+	if cbErr != nil {
 		metrics.RiotAPICallsTotal.WithLabelValues(endpoint, "error").Inc()
-		span.RecordError(err)
-		span.SetStatus(codes.Error, err.Error())
-		return err
+		span.RecordError(cbErr)
+		span.SetStatus(codes.Error, cbErr.Error())
+		return cbErr
 	}
 	defer resp.Body.Close()
 

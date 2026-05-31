@@ -145,6 +145,18 @@ var RateLimitRejectedTotal = prometheus.NewCounter(
 	},
 )
 
+// ── Circuit breaker ───────────────────────────────────────────────────────────
+
+// CircuitBreakerState tracks the current state of the circuit breaker.
+// Values: 0 = closed (healthy), 1 = half-open (probing), 2 = open (tripped).
+var CircuitBreakerState = prometheus.NewGaugeVec(
+	prometheus.GaugeOpts{
+		Name: "circuit_breaker_state",
+		Help: "Current circuit breaker state: 0=closed, 1=half-open, 2=open.",
+	},
+	[]string{"name"},
+)
+
 // init registers all metrics with the default Prometheus registry.
 // This runs automatically when any package imports lol-match-tracker/internal/metrics.
 func init() {
@@ -161,5 +173,6 @@ func init() {
 		RankWorkerTasksTotal,
 		RankWorkerTasksDropped,
 		RateLimitRejectedTotal,
+		CircuitBreakerState,
 	)
 }

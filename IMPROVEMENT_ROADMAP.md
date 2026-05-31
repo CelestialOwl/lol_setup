@@ -11,7 +11,14 @@ Review of proposed improvements against the current LoL Match Tracker codebase (
 - [x] Phase 1.2: Structured logging cleanup
 - [x] Phase 1.3: Unit tests (server)
 - [x] Phase 1.4: CI/CD pipeline
-- [ ] Phase 2+
+- [x] Phase 2.1: Rate limiting (per-IP token bucket)
+- [x] Phase 2.2: Circuit breaker (Riot API)
+- [ ] Phase 2.3: API versioning
+- [x] Phase 3.1: Prometheus metrics + Grafana dashboard
+- [x] Phase 3.2: OpenTelemetry tracing + Jaeger
+- [x] Phase 4.1: Background rank-fetch worker (in-process queue)
+- [x] Phase 4.2: k6 load testing (smoke, load, stress, soak scripts)
+- [ ] Phase 4.3: Kubernetes deployment
 
 ---
 
@@ -74,13 +81,15 @@ This file is the persisted roadmap for future reference.
 
 ## Phase 2: Reliability (After Foundation)
 
-### 2.1 Rate Limiting
-- Add per-IP token bucket middleware (`golang.org/x/time/rate`).
-- Defer distributed Redis limiter until horizontal scaling is needed.
+### 2.1 Rate Limiting ✅
+- Added per-IP token bucket middleware (`golang.org/x/time/rate`).
+- `RATE_LIMIT_RPS` (default 10/s) + `RATE_LIMIT_BURST` (default 20) configurable via env.
+- `rate_limit_rejected_total` Prometheus counter added.
 
-### 2.2 Circuit Breaker
-- Add `sony/gobreaker` for Riot API calls.
-- Configure fail/open/half-open behavior and fallback responses.
+### 2.2 Circuit Breaker ✅
+- `sony/gobreaker` wraps all Riot API HTTP calls.
+- Trips after 5 consecutive 5xx/429 responses, open for 30s, 2 probe requests in half-open.
+- `circuit_breaker_state` Prometheus gauge tracks state changes (0=closed, 1=half-open, 2=open).
 
 ### 2.3 API Versioning
 - Move routes under `/api/v1`.
@@ -104,11 +113,15 @@ This file is the persisted roadmap for future reference.
 
 ## Phase 4: Advanced (After Observability)
 
-### 4.1 Background Jobs and Queues
-- Use `asynq` for async match detail fetch and periodic sync tasks.
+### 4.1 Background Jobs and Queues ✅
+- In-process `RankFetchWorker`: buffered channel (cap 1000), `sync.Map` dedup, ticker-based rate limiting.
+- Enqueues all 10 match participants after each match-history fetch.
+- `RANK_WORKER_RPM` env var (default 10/min). Three Grafana panels: queue depth, tasks processed, tasks dropped.
 
-### 4.2 Performance & Load Testing
-- Use `k6` to test core endpoints and measure p95/p99.
+### 4.2 Performance & Load Testing ✅
+- `k6` scripts in `server/loadtest/`: `smoke.js`, `load.js`, `stress.js`, `soak.js`.
+- Makefile targets: `make loadtest-smoke`, `make loadtest-load`, `make loadtest-stress`.
+- Defaults to `bro#han` / `Agurin#DND` (euw1). Override via `GAME_NAME`, `TAG_LINE`, `REGION` env vars.
 
 ### 4.3 Kubernetes Deployment
 - Start with local cluster (`kind` or `minikube`).
