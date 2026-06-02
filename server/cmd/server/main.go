@@ -82,10 +82,12 @@ func main() {
 	summonerService := services.NewSummonerService(summonerRepo, matchRepo, riotAPIService, redisClient, cfg).
 		WithRankWorker(rankWorker)
 	liveGameService := services.NewLiveGameService(riotAPIService)
+	trackerPoller := services.NewTrackerPoller(riotAPIService)
 
 	// Initialize handlers
 	summonerHandler := handlers.NewSummonerHandler(summonerService)
 	liveGameHandler := handlers.NewLiveGameHandler(liveGameService)
+	trackerWSHandler := handlers.NewTrackerWSHandler(trackerPoller)
 
 	// Initialize Gin router
 	router := gin.New()
@@ -149,6 +151,9 @@ func main() {
 		// Live game route
 		api.GET("/live-game", liveGameHandler.GetLiveGame)
 	}
+
+	// WebSocket tracker — live game polling for up to 5 players
+	router.GET("/ws/tracker", trackerWSHandler.HandleTrackerWS)
 
 	// Start server with graceful shutdown
 	addr := ":" + cfg.Port

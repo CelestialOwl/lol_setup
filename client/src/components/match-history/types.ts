@@ -13,6 +13,8 @@ export interface TeamRosterEntry {
   isPlayer: boolean;
   puuid: string;
   tagLine?: string;
+  /** TOP | JUNGLE | MIDDLE | BOTTOM | UTILITY — from teamPosition in match data */
+  role?: string;
 }
 
 export interface PlayerMatchCard {
@@ -32,6 +34,8 @@ export interface PlayerMatchCard {
   itemIds: number[];
   kills: number;
   matchId: string;
+  /** Player's own role for this match: TOP | JUNGLE | MIDDLE | BOTTOM | UTILITY */
+  role?: string;
   spellIds: [number, number];
   win: boolean;
 }

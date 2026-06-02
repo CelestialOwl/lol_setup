@@ -46,6 +46,8 @@ export interface Participant {
   riotIdTagline?: string;
   summonerName: string;
   teamId: number;
+  /** Assigned lane/role from completed match data: TOP | JUNGLE | MIDDLE | BOTTOM | UTILITY */
+  teamPosition?: string;
   kills: number;
   deaths: number;
   assists: number;
@@ -169,7 +171,10 @@ export interface CurrentGameParticipant {
   profileIconId: number;
   bot: boolean;
   teamId: number;
+  /** Legacy display name (may be empty on newer accounts) */
   summonerName: string;
+  /** Riot ID in "GameName#TAG" format — present on spectator v5 responses */
+  riotId?: string;
   summonerId: string;
   puuid: string;
   spell1Id: number;

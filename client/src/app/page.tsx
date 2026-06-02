@@ -5,6 +5,7 @@ import LiveGame, { NoActiveGame } from "@/components/LiveGame";
 import MatchHistory from "@/components/MatchHistory";
 import SearchComponent from "@/components/SearchComponent";
 import { LiveGameData, SearchFormData, SummonerData } from "@/types/riot-api";
+import Link from "next/link";
 import { useRef, useState } from "react";
 
 type ViewMode = "match-history" | "live-game";
@@ -115,6 +116,19 @@ export default function HomePage() {
   return (
     <main className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-slate-950 dark:to-slate-900 py-8">
       <div className="container mx-auto px-4">
+        {/* Nav link to tracker */}
+        <div className="flex justify-end mb-2">
+          <Link
+            href="/tracker"
+            className="inline-flex items-center gap-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 px-3 py-1.5 text-sm font-medium text-slate-700 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 shadow-sm transition-colors"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+            Multi-Player Tracker
+          </Link>
+        </div>
+
         <SearchComponent onSearch={handleSearch} loading={loading} />
 
         {/* View Mode Toggle */}

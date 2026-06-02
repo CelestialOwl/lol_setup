@@ -11,6 +11,14 @@ function leagueEntryToTeammateInfo(entry: LeagueEntry, puuid: string): TeammateI
   };
 }
 
+const ROLE_ORDER: Record<string, number> = {
+  TOP: 1,
+  JUNGLE: 2,
+  MIDDLE: 3,
+  BOTTOM: 4,
+  UTILITY: 5,
+};
+
 function toRosterEntry(
   participant: Participant,
   playerPuuid: string,
@@ -26,6 +34,7 @@ function toRosterEntry(
       : participant.teammateRankInfo,
     isPlayer: participant.puuid === playerPuuid,
     puuid: participant.puuid,
+    role: participant.teamPosition,
     tagLine: participant.riotIdTagline,
   };
 }
@@ -46,11 +55,13 @@ export function buildPlayerMatches(summonerData: SummonerData): PlayerMatchCard[
     const allies = participants
       .filter((participant) => participant.teamId === playerData.teamId)
       .map((participant) => toRosterEntry(participant, account.puuid, ranks))
-      .sort((left, right) => Number(right.isPlayer) - Number(left.isPlayer));
+      // Sort by role order (TOP→JG→MID→BOT→SUP). Unknown roles go last.
+      .sort((a, b) => (ROLE_ORDER[a.role ?? ""] ?? 6) - (ROLE_ORDER[b.role ?? ""] ?? 6));
 
     const enemies = participants
       .filter((participant) => participant.teamId !== playerData.teamId)
-      .map((participant) => toRosterEntry(participant, account.puuid, ranks));
+      .map((participant) => toRosterEntry(participant, account.puuid, ranks))
+      .sort((a, b) => (ROLE_ORDER[a.role ?? ""] ?? 6) - (ROLE_ORDER[b.role ?? ""] ?? 6));
 
     const cs =
       (playerData.totalMinionsKilled ?? 0) +
@@ -83,6 +94,7 @@ export function buildPlayerMatches(summonerData: SummonerData): PlayerMatchCard[
       ],
       kills: playerData.kills,
       matchId: match.metadata.matchId,
+      role: playerData.teamPosition,
       spellIds: [playerData.summoner1Id, playerData.summoner2Id],
       win: playerData.win,
     };

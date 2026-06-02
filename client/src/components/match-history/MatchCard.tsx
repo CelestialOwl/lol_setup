@@ -7,6 +7,16 @@ import {
   getSummonerSpellImageUrl,
   getSummonerSpellInfo,
 } from "@/data/champions";
+
+const CDN = "https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-static-assets/global/default/images/position-selector/positions";
+
+const ROLE_ICONS: Record<string, { label: string; url: string }> = {
+  TOP:     { label: "Top",     url: `${CDN}/icon-position-top.png`     },
+  JUNGLE:  { label: "Jungle",  url: `${CDN}/icon-position-jungle.png`  },
+  MIDDLE:  { label: "Mid",     url: `${CDN}/icon-position-middle.png`  },
+  BOTTOM:  { label: "Bot",     url: `${CDN}/icon-position-bottom.png`  },
+  UTILITY: { label: "Support", url: `${CDN}/icon-position-support.png` },
+};
 import IconBox from "./IconBox";
 import InventoryRow from "./InventoryRow";
 import RosterRow from "./RosterRow";
@@ -86,9 +96,20 @@ export default function MatchCard({
                 />
               </div>
               <div>
-                <p className="text-lg font-semibold text-slate-800 dark:text-slate-100">
-                  {match.champion}
-                </p>
+                <div className="flex items-center gap-1.5">
+                  <p className="text-lg font-semibold text-slate-800 dark:text-slate-100">
+                    {match.champion}
+                  </p>
+                  {match.role && ROLE_ICONS[match.role] && (
+                    <img
+                      src={ROLE_ICONS[match.role].url}
+                      alt={ROLE_ICONS[match.role].label}
+                      title={ROLE_ICONS[match.role].label}
+                      className="h-5 w-5 object-contain opacity-75"
+                      onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                    />
+                  )}
+                </div>
                 <p className="text-sm font-medium text-slate-700 dark:text-slate-300">
                   {match.kills}/{match.deaths}/{match.assists}
                   <span className="ml-2 text-slate-500 dark:text-slate-400">
