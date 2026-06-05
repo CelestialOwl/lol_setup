@@ -1,23 +1,50 @@
 package main
 
 import (
-	"log"
+	"context"
+	"log/slog"
+	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"lol-match-tracker/internal/cache"
 	"lol-match-tracker/internal/config"
 	"lol-match-tracker/internal/database"
 	"lol-match-tracker/internal/handlers"
+	_ "lol-match-tracker/internal/metrics" // register Prometheus metrics on import
 	"lol-match-tracker/internal/middleware"
 	"lol-match-tracker/internal/repository"
 	"lol-match-tracker/internal/services"
+	"lol-match-tracker/internal/tracing"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
 )
 
 func main() {
 	// Load configuration
 	cfg := config.Load()
+
+	// Initialise OpenTelemetry tracing (no-op when OTEL_ENDPOINT is unset)
+	tracingShutdown, err := tracing.Init(context.Background(), cfg.OtelEndpoint, cfg.OtelServiceName)
+	if err != nil {
+		slog.Error("failed to initialise tracing", "error", err)
+		os.Exit(1)
+	}
+	defer func() {
+		if err := tracingShutdown(context.Background()); err != nil {
+			slog.Error("tracing shutdown error", "error", err)
+		}
+	}()
+
+	// Configure structured logger
+	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
+		Level: parseLogLevel(cfg.LogLevel),
+	})))
 
 	// Set Gin mode
 	gin.SetMode(cfg.GinMode)
@@ -25,14 +52,16 @@ func main() {
 	// Initialize database
 	db, err := database.NewPostgresDB(cfg)
 	if err != nil {
-		log.Fatalf("Failed to connect to database: %v", err)
+		slog.Error("failed to connect to database", "error", err)
+		os.Exit(1)
 	}
 	defer db.Close()
 
 	// Initialize Redis cache
 	redisClient, err := cache.NewRedisClient(cfg)
 	if err != nil {
-		log.Fatalf("Failed to connect to Redis: %v", err)
+		slog.Error("failed to connect to Redis", "error", err)
+		os.Exit(1)
 	}
 	defer redisClient.Close()
 
@@ -42,29 +71,65 @@ func main() {
 
 	// Initialize services
 	riotAPIService := services.NewRiotAPIService(cfg.RiotAPIKey)
-	summonerService := services.NewSummonerService(summonerRepo, matchRepo, riotAPIService, redisClient, cfg)
+
+	// Background rank-fetch worker — rate-limited, best-effort
+	workerCtx, workerCancel := context.WithCancel(context.Background())
+	defer workerCancel()
+	rankWorker := services.NewRankFetchWorker(riotAPIService, summonerRepo, cfg.RankWorkerRPM)
+	rankWorker.Start(workerCtx)
+	defer rankWorker.Stop()
+
+	summonerService := services.NewSummonerService(summonerRepo, matchRepo, riotAPIService, redisClient, cfg).
+		WithRankWorker(rankWorker)
 	liveGameService := services.NewLiveGameService(riotAPIService)
+	trackerPoller := services.NewTrackerPoller(riotAPIService)
 
 	// Initialize handlers
 	summonerHandler := handlers.NewSummonerHandler(summonerService)
 	liveGameHandler := handlers.NewLiveGameHandler(liveGameService)
+	trackerWSHandler := handlers.NewTrackerWSHandler(trackerPoller)
 
 	// Initialize Gin router
 	router := gin.New()
 
 	// Middleware
+	router.Use(middleware.RequestID())
+	rateLimiter := middleware.NewIPRateLimiter(cfg.RateLimitRPS, cfg.RateLimitBurst)
+	defer rateLimiter.Stop()
+	router.Use(rateLimiter.RateLimit())
+	router.Use(otelgin.Middleware(cfg.OtelServiceName)) // must be before Logger so span is active
 	router.Use(middleware.Logger())
 	router.Use(middleware.ErrorHandler())
 	router.Use(cors.New(cors.Config{
 		AllowOrigins:     cfg.AllowedOrigins,
 		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-		AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization", "X-Requested-With"},
+		AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization", "X-Requested-With", "X-Request-ID"},
 		AllowCredentials: true,
 	}))
 
-	// Health check endpoint
+	// Metrics endpoint — scraped by Prometheus every 15 s.
+	// Excluded from request logging middleware to avoid noise.
+	router.GET("/metrics", gin.WrapH(promhttp.Handler()))
+
+	// Health check endpoint — verifies DB and Redis are reachable
 	router.GET("/health", func(c *gin.Context) {
-		c.JSON(200, gin.H{
+		if err := db.Ping(); err != nil {
+			c.JSON(http.StatusServiceUnavailable, gin.H{
+				"status": "degraded",
+				"db":     "unhealthy",
+				"error":  err.Error(),
+			})
+			return
+		}
+		if err := redisClient.Ping(c.Request.Context()); err != nil {
+			c.JSON(http.StatusServiceUnavailable, gin.H{
+				"status": "degraded",
+				"redis":  "unhealthy",
+				"error":  err.Error(),
+			})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{
 			"status":  "ok",
 			"service": "lol-match-tracker-api",
 		})
@@ -76,20 +141,62 @@ func main() {
 		// Summoner routes
 		summoner := api.Group("/summoner")
 		{
-			summoner.GET("", summonerHandler.GetSummoner)
-			summoner.POST("/search", summonerHandler.SearchSummoner)
-			summoner.GET("/:puuid/stats", summonerHandler.GetSummonerStats)
+			summoner.GET("", summonerHandler.GetSummoner)                        // profile only
+			summoner.POST("/search", summonerHandler.SearchSummoner)             // same as GET but via POST body
+			summoner.GET("/:puuid/matches", summonerHandler.GetMatchHistory)     // match history
+			summoner.GET("/:puuid/stats", summonerHandler.GetSummonerStats)      // aggregate stats
+			summoner.GET("/:puuid/rank", summonerHandler.GetRank)                // latest rank from DB
+			summoner.GET("/:puuid/rank/history", summonerHandler.GetRankHistory) // LP history for charts
 		}
 		// Live game route
 		api.GET("/live-game", liveGameHandler.GetLiveGame)
 	}
 
-	// Start server
-	port := ":" + cfg.Port
-	log.Printf("Starting server on port %s", port)
-	log.Printf("Allowed origins: %v", cfg.AllowedOrigins)
+	// WebSocket tracker — live game polling for up to 5 players
+	router.GET("/ws/tracker", trackerWSHandler.HandleTrackerWS)
 
-	if err := router.Run(port); err != nil {
-		log.Fatalf("Failed to start server: %v", err)
+	// Start server with graceful shutdown
+	addr := ":" + cfg.Port
+	srv := &http.Server{
+		Addr:         addr,
+		Handler:      router,
+		ReadTimeout:  15 * time.Second,
+		WriteTimeout: 15 * time.Second,
+		IdleTimeout:  60 * time.Second,
+	}
+
+	slog.Info("starting server", "addr", addr, "allowed_origins", cfg.AllowedOrigins)
+
+	go func() {
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			slog.Error("server error", "error", err)
+			os.Exit(1)
+		}
+	}()
+
+	// Block until OS signal received
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+	<-quit
+
+	slog.Info("shutting down server…")
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if err := srv.Shutdown(ctx); err != nil {
+		slog.Error("server forced shutdown", "error", err)
+	}
+	slog.Info("server stopped")
+}
+
+func parseLogLevel(level string) slog.Level {
+	switch level {
+	case "debug", "DEBUG":
+		return slog.LevelDebug
+	case "warn", "WARN", "warning", "WARNING":
+		return slog.LevelWarn
+	case "error", "ERROR":
+		return slog.LevelError
+	default:
+		return slog.LevelInfo
 	}
 }

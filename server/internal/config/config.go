@@ -22,8 +22,9 @@ type Config struct {
 	RedisPassword string
 
 	// Server
-	Port    string
-	GinMode string
+	Port     string
+	GinMode  string
+	LogLevel string
 
 	// API
 	RiotAPIKey string
@@ -35,6 +36,23 @@ type Config struct {
 	SummonerCacheTTL int
 	MatchCacheTTL    int
 	LiveGameCacheTTL int
+
+	// Observability — OpenTelemetry
+	// OtelEndpoint is the OTLP/HTTP receiver URL, e.g. http://jaeger:4318
+	// Leave empty to disable tracing (uses a no-op provider).
+	OtelEndpoint    string
+	OtelServiceName string
+
+	// Background worker
+	// RankWorkerRPM controls how many Riot rank-API calls the background
+	// worker makes per minute. Defaults to 10 (one every 6 s).
+	RankWorkerRPM int
+
+	// Rate limiting
+	// RateLimitRPS is the sustained requests/second allowed per IP.
+	RateLimitRPS float64
+	// RateLimitBurst is the maximum burst size per IP.
+	RateLimitBurst int
 }
 
 func Load() *Config {
@@ -55,8 +73,9 @@ func Load() *Config {
 		RedisPassword: getEnv("REDIS_PASSWORD", ""),
 
 		// Server
-		Port:    getEnv("PORT", "8080"),
-		GinMode: getEnv("GIN_MODE", "debug"),
+		Port:     getEnv("PORT", "8080"),
+		GinMode:  getEnv("GIN_MODE", "debug"),
+		LogLevel: getEnv("LOG_LEVEL", "info"),
 
 		// API
 		RiotAPIKey: getEnv("RIOT_API_KEY", ""),
@@ -68,6 +87,17 @@ func Load() *Config {
 		SummonerCacheTTL: getEnvAsInt("SUMMONER_CACHE_TTL", 300),
 		MatchCacheTTL:    getEnvAsInt("MATCH_CACHE_TTL", 900),
 		LiveGameCacheTTL: getEnvAsInt("LIVE_GAME_CACHE_TTL", 60),
+
+		// Observability
+		OtelEndpoint:    getEnv("OTEL_ENDPOINT", ""),
+		OtelServiceName: getEnv("OTEL_SERVICE_NAME", "lol-match-tracker-api"),
+
+		// Background worker
+		RankWorkerRPM: getEnvAsInt("RANK_WORKER_RPM", 25),
+
+		// Rate limiting
+		RateLimitRPS:   getEnvAsFloat("RATE_LIMIT_RPS", 10),
+		RateLimitBurst: getEnvAsInt("RATE_LIMIT_BURST", 20),
 	}
 }
 
@@ -82,6 +112,15 @@ func getEnvAsInt(key string, defaultValue int) int {
 	if value := os.Getenv(key); value != "" {
 		if intValue, err := strconv.Atoi(value); err == nil {
 			return intValue
+		}
+	}
+	return defaultValue
+}
+
+func getEnvAsFloat(key string, defaultValue float64) float64 {
+	if value := os.Getenv(key); value != "" {
+		if f, err := strconv.ParseFloat(value, 64); err == nil {
+			return f
 		}
 	}
 	return defaultValue

@@ -1,0 +1,20 @@
+meta {
+  name: getByMatchId
+  type: http
+  seq: 5
+}
+
+get {
+  url: https://europe.api.riotgames.com/lol/match/v5/matches/ME1_18108877?api_key={{api_key}}
+  body: none
+  auth: inherit
+}
+
+params:query {
+  api_key: {{api_key}}
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

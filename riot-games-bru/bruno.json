@@ -1,0 +1,10 @@
+{
+  "version": "1",
+  "name": "Riot Games API Collection",
+  "type": "collection",
+  "description": "A collection of Bruno requests for the Riot Games API to interact with League of Legends data.",
+  "ignore": [
+    "node_modules",
+    ".git"
+  ]
+}

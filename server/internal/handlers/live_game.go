@@ -28,7 +28,7 @@ func (h *LiveGameHandler) GetLiveGame(c *gin.Context) {
 		return
 	}
 
-	result, err := h.liveGameService.GetLiveGame(gameName, tagLine, region)
+	result, err := h.liveGameService.GetLiveGame(c.Request.Context(), gameName, tagLine, region)
 	if err != nil {
 		if errors.Is(err, services.ErrNotInGame) {
 			c.JSON(http.StatusNotFound, gin.H{

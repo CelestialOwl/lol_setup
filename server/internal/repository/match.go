@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"strings"
@@ -18,7 +19,7 @@ func NewMatchRepository(db *database.DB) *MatchRepository {
 }
 
 // BulkInsert inserts multiple matches efficiently
-func (r *MatchRepository) BulkInsert(matches []models.Match) error {
+func (r *MatchRepository) BulkInsert(ctx context.Context, matches []models.Match) error {
 	if len(matches) == 0 {
 		return nil
 	}
@@ -46,12 +47,12 @@ func (r *MatchRepository) BulkInsert(matches []models.Match) error {
 		ON CONFLICT (match_id) DO NOTHING
 	`, strings.Join(valueStrings, ","))
 
-	_, err := r.db.Exec(query, valueArgs...)
+	_, err := r.db.ExecContext(ctx, query, valueArgs...)
 	return err
 }
 
 // GetRecentMatchesForPUUID retrieves recent matches for a summoner
-func (r *MatchRepository) GetRecentMatchesForPUUID(puuid string, limit int) ([]models.Match, error) {
+func (r *MatchRepository) GetRecentMatchesForPUUID(ctx context.Context, puuid string, limit int) ([]models.Match, error) {
 	query := `
 		SELECT DISTINCT m.match_id, m.game_creation, m.game_duration, m.game_mode, 
 		       m.queue_id, m.region, m.match_data, m.created_at, m.last_updated
@@ -62,7 +63,7 @@ func (r *MatchRepository) GetRecentMatchesForPUUID(puuid string, limit int) ([]m
 		LIMIT $2
 	`
 
-	rows, err := r.db.Query(query, puuid, limit)
+	rows, err := r.db.QueryContext(ctx, query, puuid, limit)
 	if err != nil {
 		return nil, err
 	}
@@ -92,7 +93,7 @@ func (r *MatchRepository) GetRecentMatchesForPUUID(puuid string, limit int) ([]m
 }
 
 // FindByID finds a match by its ID
-func (r *MatchRepository) FindByID(matchID string) (*models.Match, error) {
+func (r *MatchRepository) FindByID(ctx context.Context, matchID string) (*models.Match, error) {
 	query := `
 		SELECT match_id, game_creation, game_duration, game_mode, queue_id, 
 		       region, match_data, created_at, last_updated
@@ -101,7 +102,7 @@ func (r *MatchRepository) FindByID(matchID string) (*models.Match, error) {
 	`
 
 	var match models.Match
-	err := r.db.QueryRow(query, matchID).Scan(
+	err := r.db.QueryRowContext(ctx, query, matchID).Scan(
 		&match.MatchID,
 		&match.GameCreation,
 		&match.GameDuration,
@@ -124,7 +125,7 @@ func (r *MatchRepository) FindByID(matchID string) (*models.Match, error) {
 }
 
 // BulkInsertParticipants inserts participants for a match
-func (r *MatchRepository) BulkInsertParticipants(matchID string, participants []models.Participant) error {
+func (r *MatchRepository) BulkInsertParticipants(ctx context.Context, matchID string, participants []models.Participant) error {
 	if len(participants) == 0 {
 		return nil
 	}
@@ -166,12 +167,12 @@ func (r *MatchRepository) BulkInsertParticipants(matchID string, participants []
 		ON CONFLICT (match_id, puuid) DO NOTHING
 	`, strings.Join(valueStrings, ","))
 
-	_, err := r.db.Exec(query, valueArgs...)
+	_, err := r.db.ExecContext(ctx, query, valueArgs...)
 	return err
 }
 
 // GetParticipants retrieves participants for a specific match
-func (r *MatchRepository) GetParticipants(matchID string) ([]models.Participant, error) {
+func (r *MatchRepository) GetParticipants(ctx context.Context, matchID string) ([]models.Participant, error) {
 	query := `
 		SELECT id, match_id, puuid, champion_id, champion_name, kills, deaths, assists,
 		       win, total_damage, gold_earned, cs_score, vision_score, kda, created_at
@@ -180,7 +181,7 @@ func (r *MatchRepository) GetParticipants(matchID string) ([]models.Participant,
 		ORDER BY id
 	`
 
-	rows, err := r.db.Query(query, matchID)
+	rows, err := r.db.QueryContext(ctx, query, matchID)
 	if err != nil {
 		return nil, err
 	}

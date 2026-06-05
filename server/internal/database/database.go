@@ -1,13 +1,20 @@
 package database
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
-	"log"
+	"log/slog"
 	"time"
 
-	_ "github.com/lib/pq"
 	"lol-match-tracker/internal/config"
+	"lol-match-tracker/internal/metrics"
+
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
+
+	_ "github.com/lib/pq"
 )
 
 type DB struct {
@@ -35,7 +42,7 @@ func NewPostgresDB(cfg *config.Config) (*DB, error) {
 		return nil, fmt.Errorf("failed to ping database: %w", err)
 	}
 
-	log.Println("Successfully connected to PostgreSQL database")
+	slog.Info("connected to PostgreSQL", "host", cfg.DBHost, "port", cfg.DBPort, "db", cfg.DBName)
 	return &DB{db}, nil
 }
 
@@ -49,7 +56,27 @@ func (db *DB) Query(query string, args ...interface{}) (*sql.Rows, error) {
 	rows, err := db.DB.Query(query, args...)
 	duration := time.Since(start)
 
-	log.Printf("Query executed in %v: %s", duration, query)
+	slog.Debug("db_query", "duration_ms", duration.Milliseconds(), "query", query)
+	return rows, err
+}
+
+// QueryContext executes a query with context and returns rows.
+func (db *DB) QueryContext(ctx context.Context, query string, args ...interface{}) (*sql.Rows, error) {
+	tracer := otel.Tracer("lol-match-tracker/database")
+	ctx, span := tracer.Start(ctx, "db.query")
+	span.SetAttributes(attribute.String("db.statement", query))
+	defer span.End()
+
+	start := time.Now()
+	rows, err := db.DB.QueryContext(ctx, query, args...)
+	duration := time.Since(start)
+
+	metrics.DBQueryDuration.WithLabelValues("query").Observe(duration.Seconds())
+	slog.Debug("db_query_context", "duration_ms", duration.Milliseconds(), "query", query)
+	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+	}
 	return rows, err
 }
 
@@ -59,7 +86,23 @@ func (db *DB) QueryRow(query string, args ...interface{}) *sql.Row {
 	row := db.DB.QueryRow(query, args...)
 	duration := time.Since(start)
 
-	log.Printf("QueryRow executed in %v: %s", duration, query)
+	slog.Debug("db_query_row", "duration_ms", duration.Milliseconds(), "query", query)
+	return row
+}
+
+// QueryRowContext executes a query with context that returns a single row.
+func (db *DB) QueryRowContext(ctx context.Context, query string, args ...interface{}) *sql.Row {
+	tracer := otel.Tracer("lol-match-tracker/database")
+	ctx, span := tracer.Start(ctx, "db.queryrow")
+	span.SetAttributes(attribute.String("db.statement", query))
+	defer span.End()
+
+	start := time.Now()
+	row := db.DB.QueryRowContext(ctx, query, args...)
+	duration := time.Since(start)
+
+	metrics.DBQueryDuration.WithLabelValues("queryrow").Observe(duration.Seconds())
+	slog.Debug("db_query_row_context", "duration_ms", duration.Milliseconds(), "query", query)
 	return row
 }
 
@@ -69,6 +112,26 @@ func (db *DB) Exec(query string, args ...interface{}) (sql.Result, error) {
 	result, err := db.DB.Exec(query, args...)
 	duration := time.Since(start)
 
-	log.Printf("Exec executed in %v: %s", duration, query)
+	slog.Debug("db_exec", "duration_ms", duration.Milliseconds(), "query", query)
+	return result, err
+}
+
+// ExecContext executes a query with context without returning rows.
+func (db *DB) ExecContext(ctx context.Context, query string, args ...interface{}) (sql.Result, error) {
+	tracer := otel.Tracer("lol-match-tracker/database")
+	ctx, span := tracer.Start(ctx, "db.exec")
+	span.SetAttributes(attribute.String("db.statement", query))
+	defer span.End()
+
+	start := time.Now()
+	result, err := db.DB.ExecContext(ctx, query, args...)
+	duration := time.Since(start)
+
+	metrics.DBQueryDuration.WithLabelValues("exec").Observe(duration.Seconds())
+	slog.Debug("db_exec_context", "duration_ms", duration.Milliseconds(), "query", query)
+	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+	}
 	return result, err
 }

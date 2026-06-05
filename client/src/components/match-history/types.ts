@@ -1,0 +1,45 @@
+import { Participant, SummonerData, TeammateInfo } from "@/types/riot-api";
+
+export interface MatchHistoryProps {
+  summonerData: SummonerData;
+  region: string;
+}
+
+export interface TeamRosterEntry {
+  championId: number;
+  championName: string;
+  gameName: string;
+  initialRank?: TeammateInfo;
+  isPlayer: boolean;
+  puuid: string;
+  tagLine?: string;
+  /** TOP | JUNGLE | MIDDLE | BOTTOM | UTILITY — from teamPosition in match data */
+  role?: string;
+}
+
+export interface PlayerMatchCard {
+  allies: TeamRosterEntry[];
+  assists: number;
+  champion: string;
+  championId: number;
+  cs: number;
+  csPerMinute: number;
+  damage: number;
+  deaths: number;
+  enemies: TeamRosterEntry[];
+  gameDate: Date;
+  gameDuration: number;
+  gameMode: string;
+  gold: number;
+  itemIds: number[];
+  kills: number;
+  matchId: string;
+  /** Player's own role for this match: TOP | JUNGLE | MIDDLE | BOTTOM | UTILITY */
+  role?: string;
+  spellIds: [number, number];
+  win: boolean;
+}
+
+export type ParticipantRankLabelGetter = (participant: TeamRosterEntry) => string;
+
+export type RosterEntryFactory = (participant: Participant, playerPuuid: string) => TeamRosterEntry;

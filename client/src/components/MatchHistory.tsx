@@ -1,271 +1,211 @@
 "use client";
 
-import { PlayerMatch, SummonerData } from "@/types/riot-api";
+import React from "react";
+import MatchCard from "@/components/match-history/MatchCard";
+import { MatchHistoryProps } from "@/components/match-history/types";
+import {
+  buildPlayerMatches,
+  formatRank,
+} from "@/components/match-history/utils";
+import { TeamRosterEntry } from "@/components/match-history/types";
+import { LeagueEntry } from "@/types/riot-api";
 
-interface MatchHistoryProps {
-  summonerData: SummonerData;
+function getProfileIconUrl(profileIconId: number) {
+  return `/dragontail/16.11.1/img/profileicon/${profileIconId}.png`;
 }
 
-export default function MatchHistory({ summonerData }: MatchHistoryProps) {
-  const { account, summoner, matches } = summonerData;
+function getRankIconUrl(tier: string) {
+  return `https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-static-assets/global/default/images/ranked-mini-crests/${tier.toLowerCase()}.svg`;
+}
 
-  // Process matches to extract player-specific data
-  const playerMatches: PlayerMatch[] = matches.map((match) => {
-    const playerData = match.info.participants.find(
-      (participant) => participant.puuid === account.puuid
-    );
+function getPlayerRank(
+  ranks: Record<string, LeagueEntry> | undefined,
+  puuid: string,
+): LeagueEntry | undefined {
+  if (!ranks) return undefined;
+  return ranks[puuid];
+}
 
-    if (!playerData) {
-      throw new Error("Player not found in match data");
+export default function MatchHistory({
+  summonerData,
+  region: _region,
+}: MatchHistoryProps) {
+  const { account, summoner, matches, ranks } = summonerData;
+  const playerMatches = buildPlayerMatches(summonerData);
+  const playerRank = getPlayerRank(ranks, account.puuid);
+
+  const getRankLabel = (participant: TeamRosterEntry): string => {
+    return formatRank(participant.initialRank);
+  };
+
+  // Calculate streak
+  const getStreak = () => {
+    if (playerMatches.length === 0) return { type: "none" as const, count: 0 };
+    const firstResult = playerMatches[0].win;
+    let count = 0;
+    for (const match of playerMatches) {
+      if (match.win === firstResult) count++;
+      else break;
     }
-
-    // Get teammates (same team, excluding the player)
-    const teammates = match.info.participants
-      .filter(
-        (participant) =>
-          participant.teamId === playerData.teamId &&
-          participant.puuid !== account.puuid
-      )
-      .map((teammate) => ({
-        puuid: teammate.puuid,
-        gameName: teammate.riotIdGameName,
-        rank: teammate.teammateRankInfo?.rank,
-        tier: teammate.teammateRankInfo?.tier,
-        leaguePoints: teammate.teammateRankInfo?.leaguePoints,
-      }));
-
-    return {
-      matchId: match.metadata.matchId,
-      champion: playerData.championName,
-      kills: playerData.kills,
-      deaths: playerData.deaths,
-      assists: playerData.assists,
-      damage: playerData.totalDamageDealtToChampions,
-      gold: playerData.goldEarned,
-      win: playerData.win,
-      gameMode: match.info.gameMode,
-      gameDuration: match.info.gameDuration,
-      gameDate: new Date(match.info.gameCreation),
-      teammates,
-    };
-  });
-
-  const formatDuration = (seconds: number): string => {
-    const minutes = Math.floor(seconds / 60);
-    const remainingSeconds = seconds % 60;
-    return `${minutes}:${remainingSeconds.toString().padStart(2, "0")}`;
+    if (count < 2) return { type: "none" as const, count: 0 };
+    return { type: firstResult ? ("win" as const) : ("loss" as const), count };
   };
 
-  const formatDate = (date: Date): string => {
-    return date.toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  };
-
-  const getKDA = (kills: number, deaths: number, assists: number): string => {
-    const kda = deaths === 0 ? kills + assists : (kills + assists) / deaths;
-    return kda.toFixed(2);
-  };
-
-  const formatRank = (
-    tier?: string,
-    rank?: string,
-    leaguePoints?: number
-  ): string => {
-    if (!tier || !rank) return "Unranked";
-
-    // Handle special tiers that don't have ranks
-    if (tier === "MASTER" || tier === "GRANDMASTER" || tier === "CHALLENGER") {
-      return `${tier.charAt(0) + tier.slice(1).toLowerCase()} ${
-        leaguePoints || 0
-      } LP`;
-    }
-
-    // Format regular tiers
-    const formattedTier = tier.charAt(0) + tier.slice(1).toLowerCase();
-    return `${formattedTier} ${rank} ${leaguePoints || 0} LP`;
-  };
-
-  const getRankColor = (tier?: string): string => {
-    if (!tier) return "text-gray-500";
-
-    switch (tier.toUpperCase()) {
-      case "IRON":
-        return "text-gray-600";
-      case "BRONZE":
-        return "text-amber-600";
-      case "SILVER":
-        return "text-gray-400";
-      case "GOLD":
-        return "text-yellow-500";
-      case "PLATINUM":
-        return "text-cyan-500";
-      case "EMERALD":
-        return "text-emerald-500";
-      case "DIAMOND":
-        return "text-blue-500";
-      case "MASTER":
-        return "text-purple-500";
-      case "GRANDMASTER":
-        return "text-red-500";
-      case "CHALLENGER":
-        return "text-orange-500";
-      default:
-        return "text-gray-500";
-    }
-  };
+  const streak = getStreak();
 
   return (
-    <div className="w-full max-w-6xl mx-auto p-6">
-      {/* Summoner Info Header */}
-      <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
-        <div className="flex items-center space-x-4">
-          <div className="w-16 h-16 bg-blue-500 rounded-full flex items-center justify-center text-white text-2xl font-bold">
-            {summoner.summonerLevel}
+    <div className="mx-auto w-full max-w-7xl p-6">
+      <div className="mb-6 rounded-2xl bg-white dark:bg-slate-900 p-6 shadow-lg shadow-slate-200/70 dark:shadow-black/30">
+        <div className="flex items-center gap-5">
+          {/* Profile Icon */}
+          <div className="relative">
+            <img
+              src={getProfileIconUrl(summoner.profileIconId)}
+              alt="Profile Icon"
+              className="h-20 w-20 rounded-xl border-2 border-slate-200 dark:border-slate-700 shadow-md"
+            />
+            <span className="absolute -bottom-2 left-1/2 -translate-x-1/2 rounded-full bg-slate-800 dark:bg-slate-700 px-2 py-0.5 text-xs font-bold text-white shadow">
+              {summoner.summonerLevel}
+            </span>
           </div>
-          <div>
-            <h2 className="text-2xl font-bold text-gray-800">
-              {account.gameName}#{account.tagLine}
+
+          {/* Name & Tag */}
+          <div className="flex-1">
+            <h2 className="text-2xl font-bold text-gray-800 dark:text-slate-100">
+              {account.gameName}
+              <span className="text-slate-400 dark:text-slate-500">
+                #{account.tagLine}
+              </span>
             </h2>
-            <p className="text-gray-600">Level {summoner.summonerLevel}</p>
+
+            {/* Rank info */}
+            {playerRank ? (
+              <div className="mt-1 flex items-center gap-2">
+                <img
+                  src={getRankIconUrl(playerRank.tier)}
+                  alt={playerRank.tier}
+                  className="h-6 w-6"
+                />
+                <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+                  {playerRank.tier.charAt(0) +
+                    playerRank.tier.slice(1).toLowerCase()}{" "}
+                  {playerRank.rank} · {playerRank.leaguePoints} LP
+                </span>
+              </div>
+            ) : (
+              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                Unranked
+              </p>
+            )}
+
+            {/* Win/Loss Stats */}
+            {playerRank && (
+              <div className="mt-1 flex items-center gap-3 text-sm">
+                <span className="text-emerald-600 dark:text-emerald-400 font-medium">
+                  {playerRank.wins}W
+                </span>
+                <span className="text-rose-600 dark:text-rose-400 font-medium">
+                  {playerRank.losses}L
+                </span>
+                <span className="text-slate-500 dark:text-slate-400">
+                  {(
+                    (playerRank.wins / (playerRank.wins + playerRank.losses)) *
+                    100
+                  ).toFixed(0)}
+                  % WR
+                </span>
+              </div>
+            )}
           </div>
+
+          {/* Streak indicator */}
+          {streak.type !== "none" && (
+            <div
+              className={`flex items-center gap-1.5 rounded-xl px-3 py-2 ${
+                streak.type === "win"
+                  ? "bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800"
+                  : "bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800"
+              }`}
+            >
+              <span className="text-xl">
+                {streak.type === "win" ? "🔥" : "🥶"}
+              </span>
+              <div className="text-center">
+                <p
+                  className={`text-sm font-bold ${
+                    streak.type === "win"
+                      ? "text-orange-700 dark:text-orange-300"
+                      : "text-blue-700 dark:text-blue-300"
+                  }`}
+                >
+                  {streak.count} {streak.type === "win" ? "Win" : "Loss"} Streak
+                </p>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Match History */}
       <div className="space-y-4">
-        <h3 className="text-xl font-semibold text-gray-800 mb-4">
+        <h3 className="mb-4 text-xl font-semibold text-gray-800">
           Recent Matches ({matches.length})
         </h3>
 
         {playerMatches.map((match) => (
-          <div
+          <MatchCard
             key={match.matchId}
-            className={`bg-white rounded-lg shadow-md p-4 border-l-4 ${
-              match.win ? "border-green-500" : "border-red-500"
-            }`}
-          >
-            <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
-              {/* Game Info */}
-              <div className="space-y-2">
-                <div className="flex items-center space-x-2">
-                  <span
-                    className={`px-2 py-1 rounded text-sm font-semibold ${
-                      match.win
-                        ? "bg-green-100 text-green-800"
-                        : "bg-red-100 text-red-800"
-                    }`}
-                  >
-                    {match.win ? "Victory" : "Defeat"}
-                  </span>
-                </div>
-                <p className="text-sm text-gray-600">{match.gameMode}</p>
-                <p className="text-sm text-gray-600">
-                  {formatDuration(match.gameDuration)}
-                </p>
-                <p className="text-sm text-gray-600">
-                  {formatDate(match.gameDate)}
-                </p>
-              </div>
-
-              {/* Champion & KDA */}
-              <div className="space-y-2">
-                <p className="font-semibold text-lg">{match.champion}</p>
-                <div className="space-y-1">
-                  <p className="text-sm">
-                    <span className="font-semibold">
-                      {match.kills}/{match.deaths}/{match.assists}
-                    </span>
-                  </p>
-                  <p className="text-sm text-gray-600">
-                    KDA: {getKDA(match.kills, match.deaths, match.assists)}
-                  </p>
-                </div>
-              </div>
-
-              {/* Stats */}
-              <div className="space-y-2">
-                <div>
-                  <p className="text-sm text-gray-600">Damage</p>
-                  <p className="font-semibold">
-                    {match.damage.toLocaleString()}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-600">Gold</p>
-                  <p className="font-semibold">{match.gold.toLocaleString()}</p>
-                </div>
-              </div>
-
-              {/* Teammates */}
-              <div className="space-y-2">
-                <p className="text-sm text-gray-600">Teammates</p>
-                <div className="space-y-1">
-                  {match.teammates.slice(0, 4).map((teammate, idx) => (
-                    <div key={idx} className="text-sm">
-                      <p className="truncate font-medium">
-                        {teammate.gameName}
-                      </p>
-                      <p
-                        className={`text-xs truncate font-semibold ${getRankColor(
-                          teammate.tier
-                        )}`}
-                      >
-                        {formatRank(
-                          teammate.tier,
-                          teammate.rank,
-                          teammate.leaguePoints
-                        )}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
+            match={match}
+            getRankLabel={getRankLabel}
+          />
         ))}
       </div>
 
-      {/* Summary Stats */}
-      <div className="bg-white rounded-lg shadow-lg p-6 mt-6">
-        <h3 className="text-xl font-semibold text-gray-800 mb-4">
+      <div className="mt-6 rounded-2xl bg-white dark:bg-slate-900 p-6 shadow-lg shadow-slate-200/70 dark:shadow-black/30">
+        <h3 className="mb-4 text-xl font-semibold text-gray-800 dark:text-slate-100">
           Match Summary
         </h3>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+        <div className="grid grid-cols-2 gap-4 text-center md:grid-cols-4">
           <div>
-            <p className="text-2xl font-bold text-green-600">
-              {playerMatches.filter((m) => m.win).length}
+            <p className="text-2xl font-bold text-emerald-700">
+              {playerMatches.filter((match) => match.win).length}
             </p>
-            <p className="text-sm text-gray-600">Wins</p>
+            <p className="text-sm text-gray-600 dark:text-slate-400">Wins</p>
           </div>
           <div>
-            <p className="text-2xl font-bold text-red-600">
-              {playerMatches.filter((m) => !m.win).length}
+            <p className="text-2xl font-bold text-rose-700">
+              {playerMatches.filter((match) => !match.win).length}
             </p>
-            <p className="text-sm text-gray-600">Losses</p>
+            <p className="text-sm text-gray-600 dark:text-slate-400">Losses</p>
           </div>
           <div>
-            <p className="text-2xl font-bold text-blue-600">
-              {(
-                (playerMatches.filter((m) => m.win).length /
-                  playerMatches.length) *
-                100
-              ).toFixed(0)}
+            <p className="text-2xl font-bold text-sky-700">
+              {playerMatches.length
+                ? (
+                    (playerMatches.filter((match) => match.win).length /
+                      playerMatches.length) *
+                    100
+                  ).toFixed(0)
+                : "0"}
               %
             </p>
-            <p className="text-sm text-gray-600">Win Rate</p>
+            <p className="text-sm text-gray-600 dark:text-slate-400">
+              Win Rate
+            </p>
           </div>
           <div>
-            <p className="text-2xl font-bold text-purple-600">
-              {(
-                playerMatches.reduce((sum, m) => sum + m.damage, 0) /
-                playerMatches.length
-              ).toFixed(0)}
+            <p className="text-2xl font-bold text-violet-700">
+              {playerMatches.length
+                ? (
+                    playerMatches.reduce(
+                      (sum, match) => sum + match.damage,
+                      0,
+                    ) / playerMatches.length
+                  ).toFixed(0)
+                : "0"}
             </p>
-            <p className="text-sm text-gray-600">Avg Damage</p>
+            <p className="text-sm text-gray-600 dark:text-slate-400">
+              Avg Damage
+            </p>
           </div>
         </div>
       </div>

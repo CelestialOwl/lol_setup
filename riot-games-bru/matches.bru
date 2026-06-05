@@ -1,0 +1,25 @@
+meta {
+  name: matches
+  type: http
+  seq: 1
+}
+
+get {
+  url: https://EUROPE.api.riotgames.com/lol/match/v5/matches/by-puuid/{{puuid}}/ids?api_key={{api_key}}
+  body: none
+  auth: inherit
+}
+
+params:query {
+  api_key: {{api_key}}
+}
+
+vars:pre-request {
+  puuid: F5h4wc3DLMZHll6NKxK6NTTcqAdPfr_xMpqaNlhNNkpfju0hGu00SelyO1WGGGE_bzpkZEJIq_w2Tg
+  api_key: RGAPI-822a7265-a69c-4aa0-9475-5877d8db6c7a
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

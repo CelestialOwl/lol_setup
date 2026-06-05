@@ -5,23 +5,34 @@ import LiveGame, { NoActiveGame } from "@/components/LiveGame";
 import MatchHistory from "@/components/MatchHistory";
 import SearchComponent from "@/components/SearchComponent";
 import { LiveGameData, SearchFormData, SummonerData } from "@/types/riot-api";
-import { useState } from "react";
+import Link from "next/link";
+import { useRef, useState } from "react";
 
 type ViewMode = "match-history" | "live-game";
 
 export default function HomePage() {
   const [loading, setLoading] = useState(false);
+  // loadingStep drives the spinner message so users see what's happening
+  const [loadingStep, setLoadingStep] = useState<"profile" | "matches">("profile");
+  const [currentRegion, setCurrentRegion] = useState<string>("euw1");
   const [error, setError] = useState<string | null>(null);
   const [summonerData, setSummonerData] = useState<SummonerData | null>(null);
   const [liveGameData, setLiveGameData] = useState<LiveGameData | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>("match-history");
   const [lastSearchedPlayer, setLastSearchedPlayer] = useState<string>("");
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   const handleSearch = async (searchData: SearchFormData) => {
+    abortControllerRef.current?.abort();
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
     setLoading(true);
+    setLoadingStep("profile");
     setError(null);
     setSummonerData(null);
     setLiveGameData(null);
+    setCurrentRegion(searchData.region);
     setLastSearchedPlayer(`${searchData.gameName}#${searchData.tagLine}`);
 
     try {
@@ -32,20 +43,45 @@ export default function HomePage() {
       });
 
       if (viewMode === "match-history") {
-        const response = await fetch(`/api/summoner?${params}`);
-        const data = await response.json();
-
-        if (!response.ok) {
-          throw new Error(data.error || "Failed to fetch summoner data");
+        // ── Step 1: profile (fast — 2 Riot API calls max) ──────────────────
+        const profileRes = await fetch(`/api/summoner?${params}`, {
+          signal: controller.signal,
+        });
+        const profile = await profileRes.json();
+        if (!profileRes.ok) {
+          throw new Error(profile.error || "Failed to fetch summoner profile");
         }
 
-        setSummonerData(data);
+        // ── Step 2: match history (slower — up to 11 Riot API calls) ───────
+        setLoadingStep("matches");
+        const matchParams = new URLSearchParams({ region: searchData.region });
+        const matchesRes = await fetch(
+          `/api/summoner/${profile.account.puuid}/matches?${matchParams}`,
+          { signal: controller.signal }
+        );
+        const matchesJson = await matchesRes.json();
+        if (!matchesRes.ok) {
+          throw new Error(matchesJson.error || "Failed to fetch match history");
+        }
+
+        // Merge profile + matches into the shape MatchHistory expects
+        setSummonerData({
+          account:      profile.account,
+          summoner:     profile.summoner,
+          matchHistory: (matchesJson.matches ?? []).map(
+            (m: { metadata: { matchId: string } }) => m.metadata.matchId
+          ),
+          matches: matchesJson.matches ?? [],
+          ranks:   matchesJson.ranks ?? {},
+        });
       } else {
-        const response = await fetch(`/api/live-game?${params}`);
+        // ── Live game ──────────────────────────────────────────────────────
+        const response = await fetch(`/api/live-game?${params}`, {
+          signal: controller.signal,
+        });
         const data = await response.json();
 
         if (response.status === 404 && !data.inGame) {
-          // Player is not in game - this is not an error, just show the no active game message
           setLiveGameData(null);
         } else if (!response.ok) {
           throw new Error(data.error || "Failed to fetch live game data");
@@ -54,17 +90,14 @@ export default function HomePage() {
         }
       }
     } catch (err) {
-      const errorMessage =
-        err instanceof Error ? err.message : "An unexpected error occurred";
-      setError(errorMessage);
+      if (err instanceof Error && err.name === "AbortError") return;
+      setError(err instanceof Error ? err.message : "An unexpected error occurred");
     } finally {
       setLoading(false);
     }
   };
 
-  const handleRetry = () => {
-    setError(null);
-  };
+  const handleRetry = () => setError(null);
 
   const handleViewModeChange = (mode: ViewMode) => {
     setViewMode(mode);
@@ -73,20 +106,40 @@ export default function HomePage() {
     setError(null);
   };
 
+  const loadingMessage =
+    viewMode === "live-game"
+      ? "Checking live game status..."
+      : loadingStep === "profile"
+      ? "Finding summoner..."
+      : "Loading match history...";
+
   return (
-    <main className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 py-8">
+    <main className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-slate-950 dark:to-slate-900 py-8">
       <div className="container mx-auto px-4">
+        {/* Nav link to tracker */}
+        <div className="flex justify-end mb-2">
+          <Link
+            href="/tracker"
+            className="inline-flex items-center gap-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 px-3 py-1.5 text-sm font-medium text-slate-700 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 shadow-sm transition-colors"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+            Multi-Player Tracker
+          </Link>
+        </div>
+
         <SearchComponent onSearch={handleSearch} loading={loading} />
 
         {/* View Mode Toggle */}
         <div className="w-full max-w-2xl mx-auto mt-4 mb-6">
-          <div className="bg-white rounded-lg shadow-md p-1 flex">
+          <div className="bg-white dark:bg-slate-900 rounded-lg shadow-md dark:shadow-black/30 p-1 flex">
             <button
               onClick={() => handleViewModeChange("match-history")}
               className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
                 viewMode === "match-history"
                   ? "bg-blue-600 text-white"
-                  : "text-gray-600 hover:text-gray-800 hover:bg-gray-100"
+                  : "text-gray-600 dark:text-slate-400 hover:text-gray-800 dark:hover:text-slate-100 hover:bg-gray-100 dark:hover:bg-slate-800"
               }`}
             >
               📊 Match History
@@ -96,7 +149,7 @@ export default function HomePage() {
               className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
                 viewMode === "live-game"
                   ? "bg-red-600 text-white"
-                  : "text-gray-600 hover:text-gray-800 hover:bg-gray-100"
+                  : "text-gray-600 dark:text-slate-400 hover:text-gray-800 dark:hover:text-slate-100 hover:bg-gray-100 dark:hover:bg-slate-800"
               }`}
             >
               🔴 Live Game
@@ -104,24 +157,14 @@ export default function HomePage() {
           </div>
         </div>
 
-        {loading && (
-          <LoadingSpinner
-            message={
-              viewMode === "live-game"
-                ? "Checking live game status..."
-                : "Loading match data..."
-            }
-          />
-        )}
+        {loading && <LoadingSpinner message={loadingMessage} />}
 
         {error && <ErrorDisplay error={error} onRetry={handleRetry} />}
 
-        {/* Match History View */}
         {viewMode === "match-history" && summonerData && !loading && !error && (
-          <MatchHistory summonerData={summonerData} />
+          <MatchHistory summonerData={summonerData} region={currentRegion} />
         )}
 
-        {/* Live Game View */}
         {viewMode === "live-game" && !loading && !error && (
           <>
             {liveGameData ? (

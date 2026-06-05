@@ -1,5 +1,7 @@
 "use client";
 
+import React from "react";
+
 interface ErrorDisplayProps {
   error: string;
   onRetry?: () => void;
@@ -8,7 +10,7 @@ interface ErrorDisplayProps {
 export default function ErrorDisplay({ error, onRetry }: ErrorDisplayProps) {
   return (
     <div className="w-full max-w-2xl mx-auto p-6">
-      <div className="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
+      <div className="bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900 rounded-lg p-6 text-center">
         <div className="text-red-600 mb-4">
           <svg
             className="w-12 h-12 mx-auto"
@@ -24,10 +26,10 @@ export default function ErrorDisplay({ error, onRetry }: ErrorDisplayProps) {
             />
           </svg>
         </div>
-        <h3 className="text-lg font-semibold text-red-800 mb-2">
+        <h3 className="text-lg font-semibold text-red-800 dark:text-red-300 mb-2">
           Something went wrong
         </h3>
-        <p className="text-red-700 mb-4">{error}</p>
+        <p className="text-red-700 dark:text-red-400 mb-4">{error}</p>
         {onRetry && (
           <button
             onClick={onRetry}
@@ -44,12 +46,12 @@ export default function ErrorDisplay({ error, onRetry }: ErrorDisplayProps) {
 export function LoadingSpinner({ message }: { message?: string }) {
   return (
     <div className="w-full max-w-2xl mx-auto p-6">
-      <div className="bg-white rounded-lg shadow-lg p-8 text-center">
+      <div className="bg-white dark:bg-slate-900 rounded-lg shadow-lg dark:shadow-black/30 p-8 text-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-        <h3 className="text-lg font-semibold text-gray-800 mb-2">
+        <h3 className="text-lg font-semibold text-gray-800 dark:text-slate-100 mb-2">
           {message || "Loading match data..."}
         </h3>
-        <p className="text-gray-600">
+        <p className="text-gray-600 dark:text-slate-400">
           {message?.includes("live")
             ? "Checking if player is currently in a game..."
             : "Fetching summoner information and match history from Riot API"}

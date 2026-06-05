@@ -1,19 +1,26 @@
 package services
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"strings"
+
+	"lol-match-tracker/internal/interfaces"
+
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
 )
 
 // ErrNotInGame is returned when the player is not currently in an active game.
 var ErrNotInGame = errors.New("player is not in an active game")
 
 type LiveGameService struct {
-	riotAPI *RiotAPIService
+	riotAPI interfaces.RiotClient
 }
 
-func NewLiveGameService(riotAPI *RiotAPIService) *LiveGameService {
+func NewLiveGameService(riotAPI interfaces.RiotClient) *LiveGameService {
 	return &LiveGameService{riotAPI: riotAPI}
 }
 
@@ -21,13 +28,30 @@ func NewLiveGameService(riotAPI *RiotAPIService) *LiveGameService {
 // and returns a response shaped to match the frontend LiveGameData type:
 //
 //	{ gameInfo, playerTeam, enemyTeam, searchedPlayer, inGame: true }
-func (s *LiveGameService) GetLiveGame(gameName, tagLine, region string) (map[string]interface{}, error) {
-	account, err := s.riotAPI.GetAccountByRiotID(gameName, tagLine, region)
+func (s *LiveGameService) GetLiveGame(ctx context.Context, gameName, tagLine, region string) (map[string]interface{}, error) {
+	tracer := otel.Tracer("lol-match-tracker/services")
+	ctx, span := tracer.Start(ctx, "service.GetLiveGame")
+	span.SetAttributes(
+		attribute.String("summoner.game_name", gameName),
+		attribute.String("summoner.tag_line", tagLine),
+		attribute.String("summoner.region", region),
+	)
+	defer span.End()
+
+	riotCtx, cancel := withTimeout(ctx, riotTimeout)
+	defer cancel()
+
+	account, err := s.riotAPI.GetAccountByRiotID(riotCtx, gameName, tagLine, region)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		return nil, fmt.Errorf("failed to get account: %w", err)
 	}
 
-	gameData, err := s.riotAPI.GetCurrentGameByPUUID(account.PUUID, region)
+	riotCtx, cancel = withTimeout(ctx, riotTimeout)
+	defer cancel()
+
+	gameData, err := s.riotAPI.GetCurrentGameByPUUID(riotCtx, account.PUUID, region)
 	if err != nil {
 		if strings.HasPrefix(err.Error(), "404") {
 			return nil, ErrNotInGame

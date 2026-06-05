@@ -12,6 +12,8 @@
 
 # testing
 /coverage
+/playwright-report
+/test-results
 
 # next.js
 /.next/
@@ -19,6 +21,7 @@
 
 # production
 /build
+/storybook-static
 
 # storybook
 /storybook-static

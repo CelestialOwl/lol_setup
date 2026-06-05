@@ -17,11 +17,10 @@ export interface Summoner {
 
 export interface LeagueEntry {
   leagueId: string;
-  summonerId: string;
-  summonerName: string;
   queueType: string;
   tier: string;
   rank: string;
+  puuid?: string;
   leaguePoints: number;
   wins: number;
   losses: number;
@@ -43,12 +42,17 @@ export interface Participant {
   puuid: string;
   championId: number;
   championName: string;
+  neutralMinionsKilled?: number;
+  riotIdTagline?: string;
   summonerName: string;
   teamId: number;
+  /** Assigned lane/role from completed match data: TOP | JUNGLE | MIDDLE | BOTTOM | UTILITY */
+  teamPosition?: string;
   kills: number;
   deaths: number;
   assists: number;
   totalDamageDealtToChampions: number;
+  totalMinionsKilled?: number;
   riotIdGameName: string;
   goldEarned: number;
   wardsPlaced: number;
@@ -109,20 +113,43 @@ export interface SummonerData {
   summoner: Summoner;
   matchHistory: string[];
   matches: Match[];
+  // puuid → latest RANKED_SOLO_5x5 snapshot for every participant with DB history
+  ranks?: Record<string, LeagueEntry>;
+}
+
+// Returned by GET /api/summoner (profile only — no matches)
+export interface SummonerProfile {
+  account: Account;
+  summoner: Summoner;
+  rank?: LeagueEntry[];
+}
+
+// Returned by GET /api/summoner/:puuid/matches
+export interface MatchHistoryData {
+  puuid: string;
+  matches: Match[];
+  total: number;
+  ranks?: Record<string, LeagueEntry>;
 }
 
 export interface PlayerMatch {
   matchId: string;
   champion: string;
+  championId?: number;
   kills: number;
   deaths: number;
   assists: number;
   damage: number;
+  cs?: number;
+  csPerMinute?: number;
+  enemies?: TeammateInfo[];
   gold: number;
   win: boolean;
   gameMode: string;
   gameDuration: number;
   gameDate: Date;
+  itemIds?: number[];
+  spellIds?: [number, number];
   teammates: TeammateInfo[];
 }
 
@@ -144,7 +171,10 @@ export interface CurrentGameParticipant {
   profileIconId: number;
   bot: boolean;
   teamId: number;
+  /** Legacy display name (may be empty on newer accounts) */
   summonerName: string;
+  /** Riot ID in "GameName#TAG" format — present on spectator v5 responses */
+  riotId?: string;
   summonerId: string;
   puuid: string;
   spell1Id: number;

@@ -1,36 +1,63 @@
 package services
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
+	"net/url"
+	"strconv"
 	"time"
 
+	"lol-match-tracker/internal/metrics"
 	"lol-match-tracker/internal/models"
+
+	"github.com/sony/gobreaker/v2"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
 )
 
 type RiotAPIService struct {
 	apiKey     string
 	httpClient *http.Client
+	cb         *gobreaker.CircuitBreaker[*http.Response]
 }
 
 func NewRiotAPIService(apiKey string) *RiotAPIService {
+	cb := gobreaker.NewCircuitBreaker[*http.Response](gobreaker.Settings{
+		Name:        "riot-api",
+		MaxRequests: 2,                // allow 2 probe requests in half-open state
+		Interval:    60 * time.Second, // reset failure counts every 60s in closed state
+		Timeout:     30 * time.Second, // stay open for 30s before moving to half-open
+		ReadyToTrip: func(counts gobreaker.Counts) bool {
+			// Trip after 5 consecutive failures
+			return counts.ConsecutiveFailures >= 5
+		},
+		OnStateChange: func(name string, from gobreaker.State, to gobreaker.State) {
+			slog.Warn("circuit breaker state change", "name", name, "from", from.String(), "to", to.String())
+			metrics.CircuitBreakerState.WithLabelValues(name).Set(float64(to))
+		},
+	})
+
 	return &RiotAPIService{
 		apiKey: apiKey,
 		httpClient: &http.Client{
 			Timeout: 10 * time.Second,
 		},
+		cb: cb,
 	}
 }
 
 // GetAccountByRiotID fetches account information by Riot ID
-func (r *RiotAPIService) GetAccountByRiotID(gameName, tagLine, region string) (*models.AccountInfo, error) {
+func (r *RiotAPIService) GetAccountByRiotID(ctx context.Context, gameName, tagLine, region string) (*models.AccountInfo, error) {
 	url := fmt.Sprintf("https://%s.api.riotgames.com/riot/account/v1/accounts/by-riot-id/%s/%s",
-		r.getRegionCluster(region), gameName, tagLine)
+		r.getRegionCluster(region), url.PathEscape(gameName), url.PathEscape(tagLine))
 
 	var account models.AccountInfo
-	err := r.makeRequest(url, &account)
+	err := r.makeRequest(ctx, "account", url, &account)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get account: %w", err)
 	}
@@ -39,11 +66,11 @@ func (r *RiotAPIService) GetAccountByRiotID(gameName, tagLine, region string) (*
 }
 
 // GetSummonerByPUUID fetches summoner information by PUUID
-func (r *RiotAPIService) GetSummonerByPUUID(puuid, region string) (*models.SummonerInfo, error) {
+func (r *RiotAPIService) GetSummonerByPUUID(ctx context.Context, puuid, region string) (*models.SummonerInfo, error) {
 	url := fmt.Sprintf("https://%s.api.riotgames.com/lol/summoner/v4/summoners/by-puuid/%s", region, puuid)
 
 	var summoner models.SummonerInfo
-	err := r.makeRequest(url, &summoner)
+	err := r.makeRequest(ctx, "summoner", url, &summoner)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get summoner: %w", err)
 	}
@@ -52,13 +79,13 @@ func (r *RiotAPIService) GetSummonerByPUUID(puuid, region string) (*models.Summo
 }
 
 // GetMatchList fetches recent matches for a summoner
-func (r *RiotAPIService) GetMatchList(puuid, region string, count int) ([]string, error) {
+func (r *RiotAPIService) GetMatchList(ctx context.Context, puuid, region string, count int) ([]string, error) {
 	regionCluster := r.getRegionCluster(region)
 	url := fmt.Sprintf("https://%s.api.riotgames.com/lol/match/v5/matches/by-puuid/%s/ids?start=0&count=%d",
 		regionCluster, puuid, count)
 
 	var matchIds []string
-	err := r.makeRequest(url, &matchIds)
+	err := r.makeRequest(ctx, "match_list", url, &matchIds)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get match list: %w", err)
 	}
@@ -67,12 +94,12 @@ func (r *RiotAPIService) GetMatchList(puuid, region string, count int) ([]string
 }
 
 // GetMatch fetches detailed match information
-func (r *RiotAPIService) GetMatch(matchID, region string) (*models.MatchData, error) {
+func (r *RiotAPIService) GetMatch(ctx context.Context, matchID, region string) (*models.MatchData, error) {
 	regionCluster := r.getRegionCluster(region)
 	url := fmt.Sprintf("https://%s.api.riotgames.com/lol/match/v5/matches/%s", regionCluster, matchID)
 
 	var matchData models.MatchData
-	err := r.makeRequest(url, &matchData)
+	err := r.makeRequest(ctx, "match", url, &matchData)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get match: %w", err)
 	}
@@ -81,12 +108,12 @@ func (r *RiotAPIService) GetMatch(matchID, region string) (*models.MatchData, er
 }
 
 // GetCurrentGameInfo fetches current game information for a summoner
-func (r *RiotAPIService) GetCurrentGameInfo(summonerID, region string) (*models.LiveGameInfo, error) {
+func (r *RiotAPIService) GetCurrentGameInfo(ctx context.Context, summonerID, region string) (*models.LiveGameInfo, error) {
 	url := fmt.Sprintf("https://%s.api.riotgames.com/lol/spectator/v4/active-games/by-summoner/%s",
 		region, summonerID)
 
 	var liveGame models.LiveGameInfo
-	err := r.makeRequest(url, &liveGame)
+	err := r.makeRequest(ctx, "current_game_v4", url, &liveGame)
 	if err != nil {
 		// If there's no active game, return nil without error
 		if err.Error() == "404" {
@@ -100,38 +127,88 @@ func (r *RiotAPIService) GetCurrentGameInfo(summonerID, region string) (*models.
 
 // GetCurrentGameByPUUID fetches live game data using the spectator v5 API with PUUID.
 // Returns the raw Riot API response as a generic map so no field mapping is needed.
-func (r *RiotAPIService) GetCurrentGameByPUUID(puuid, region string) (map[string]interface{}, error) {
+func (r *RiotAPIService) GetCurrentGameByPUUID(ctx context.Context, puuid, region string) (map[string]interface{}, error) {
 	url := fmt.Sprintf("https://%s.api.riotgames.com/lol/spectator/v5/active-games/by-summoner/%s",
 		region, puuid)
 
 	var gameData map[string]interface{}
-	if err := r.makeRequest(url, &gameData); err != nil {
+	if err := r.makeRequest(ctx, "live_game", url, &gameData); err != nil {
 		return nil, err
 	}
 
 	return gameData, nil
 }
 
-// makeRequest makes an HTTP request to the Riot API
-func (r *RiotAPIService) makeRequest(url string, dest interface{}) error {
-	req, err := http.NewRequest("GET", url, nil)
+// GetLeagueEntriesByPUUID fetches ranked queue entries for a summoner by PUUID.
+// Uses the platform endpoint (e.g. na1.api.riotgames.com), not the regional cluster.
+func (r *RiotAPIService) GetLeagueEntriesByPUUID(ctx context.Context, puuid, region string) ([]models.LeagueEntry, error) {
+	apiURL := fmt.Sprintf("https://%s.api.riotgames.com/lol/league/v4/entries/by-puuid/%s",
+		region, url.PathEscape(puuid))
+
+	var entries []models.LeagueEntry
+	if err := r.makeRequest(ctx, "rank", apiURL, &entries); err != nil {
+		return nil, fmt.Errorf("failed to get league entries: %w", err)
+	}
+
+	return entries, nil
+}
+
+// makeRequest makes an authenticated GET request to the Riot API, records
+// Prometheus metrics (call count by endpoint+status, latency by endpoint),
+// emits an OTel span, and decodes the JSON response body into dest.
+func (r *RiotAPIService) makeRequest(ctx context.Context, endpoint, url string, dest interface{}) error {
+	tracer := otel.Tracer("lol-match-tracker/riot_api")
+	ctx, span := tracer.Start(ctx, "riot_api."+endpoint)
+	defer span.End()
+
+	span.SetAttributes(
+		attribute.String("riot.endpoint", endpoint),
+		attribute.String("http.url", url),
+	)
+
+	start := time.Now()
+
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
 		return err
 	}
 
-	fmt.Println("Making request to Riot API:", url, r.apiKey) // Debug log for request URL
 	req.Header.Set("X-Riot-Token", r.apiKey)
 	req.Header.Set("Content-Type", "application/json")
 
-	resp, err := r.httpClient.Do(req)
-	if err != nil {
-		return err
+	resp, cbErr := r.cb.Execute(func() (*http.Response, error) {
+		res, err := r.httpClient.Do(req)
+		if err != nil {
+			return nil, err
+		}
+		// Treat 5xx and 429 as failures that should trip the breaker
+		if res.StatusCode >= 500 || res.StatusCode == 429 {
+			body, _ := io.ReadAll(res.Body)
+			res.Body.Close()
+			return nil, fmt.Errorf("%d: %s", res.StatusCode, string(body))
+		}
+		return res, nil
+	})
+	duration := time.Since(start)
+	metrics.RiotAPIDuration.WithLabelValues(endpoint).Observe(duration.Seconds())
+
+	if cbErr != nil {
+		metrics.RiotAPICallsTotal.WithLabelValues(endpoint, "error").Inc()
+		span.RecordError(cbErr)
+		span.SetStatus(codes.Error, cbErr.Error())
+		return cbErr
 	}
 	defer resp.Body.Close()
 
+	statusStr := strconv.Itoa(resp.StatusCode)
+	metrics.RiotAPICallsTotal.WithLabelValues(endpoint, statusStr).Inc()
+	span.SetAttributes(attribute.Int("http.status_code", resp.StatusCode))
+
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("%d: %s", resp.StatusCode, string(body))
+		errMsg := fmt.Sprintf("%d: %s", resp.StatusCode, string(body))
+		span.SetStatus(codes.Error, errMsg)
+		return fmt.Errorf("%s", errMsg)
 	}
 
 	body, err := io.ReadAll(resp.Body)
@@ -153,6 +230,7 @@ func (r *RiotAPIService) getRegionCluster(region string) string {
 		"eun1": "europe",
 		"tr1":  "europe",
 		"ru":   "europe",
+		"me1":  "europe",
 		"kr":   "asia",
 		"jp1":  "asia",
 		"oc1":  "sea",

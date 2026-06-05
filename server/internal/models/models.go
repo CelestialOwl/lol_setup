@@ -72,12 +72,63 @@ type Participant struct {
 	CreatedAt    time.Time `json:"createdAt" db:"created_at"`
 }
 
-// SummonerResponse represents the API response for summoner data
+// SummonerResponse represents the legacy combined API response (kept for compatibility).
 type SummonerResponse struct {
 	Account  AccountInfo   `json:"account"`
 	Summoner SummonerInfo  `json:"summoner"`
 	Matches  []MatchData   `json:"matches"`
 	LiveGame *LiveGameInfo `json:"liveGame,omitempty"`
+}
+
+// SummonerProfileResponse is returned by GET /api/summoner.
+// Contains account + summoner info, plus the freshly-fetched rank for the searched player.
+type SummonerProfileResponse struct {
+	Account  AccountInfo   `json:"account"`
+	Summoner SummonerInfo  `json:"summoner"`
+	Rank     []LeagueEntry `json:"rank,omitempty"`
+}
+
+// MatchHistoryResponse is returned by GET /api/summoner/:puuid/matches.
+// Ranks is a map of puuid → latest RANKED_SOLO_5x5 snapshot from DB for every
+// participant that has one; omitted/null means no historical data available.
+type MatchHistoryResponse struct {
+	PUUID   string                  `json:"puuid"`
+	Matches []MatchData             `json:"matches"`
+	Total   int                     `json:"total"`
+	Ranks   map[string]*LeagueEntry `json:"ranks,omitempty"`
+}
+
+// LeagueEntry represents a single ranked queue entry from the Riot league API.
+type LeagueEntry struct {
+	LeagueID     string `json:"leagueId"`
+	QueueType    string `json:"queueType"`
+	Tier         string `json:"tier"`
+	Rank         string `json:"rank"`
+	PUUID        string `json:"puuid,omitempty"`
+	LeaguePoints int    `json:"leaguePoints"`
+	Wins         int    `json:"wins"`
+	Losses       int    `json:"losses"`
+	Veteran      bool   `json:"veteran"`
+	Inactive     bool   `json:"inactive"`
+	FreshBlood   bool   `json:"freshBlood"`
+	HotStreak    bool   `json:"hotStreak"`
+}
+
+// RankSnapshot represents one row in the rank_snapshots table.
+type RankSnapshot struct {
+	ID           int       `json:"id" db:"id"`
+	PUUID        string    `json:"puuid" db:"puuid"`
+	QueueType    string    `json:"queueType" db:"queue_type"`
+	Tier         string    `json:"tier" db:"tier"`
+	Rank         string    `json:"rank" db:"rank"`
+	LeaguePoints int       `json:"leaguePoints" db:"league_points"`
+	Wins         int       `json:"wins" db:"wins"`
+	Losses       int       `json:"losses" db:"losses"`
+	HotStreak    bool      `json:"hotStreak" db:"hot_streak"`
+	Veteran      bool      `json:"veteran" db:"veteran"`
+	FreshBlood   bool      `json:"freshBlood" db:"fresh_blood"`
+	Inactive     bool      `json:"inactive" db:"inactive"`
+	RecordedAt   time.Time `json:"recordedAt" db:"recorded_at"`
 }
 
 // AccountInfo represents Riot account information
@@ -125,7 +176,7 @@ type LiveParticipant struct {
 type SearchRequest struct {
 	GameName string `json:"gameName" validate:"required,min=1,max=16"`
 	TagLine  string `json:"tagLine" validate:"required,min=1,max=5"`
-	Region   string `json:"region" validate:"required,oneof=na1 euw1 eun1 kr oc1 jp1 br1 las lan1 tr1 ru"`
+	Region   string `json:"region" validate:"required,oneof=na1 euw1 eun1 kr oc1 jp1 br1 las lan1 tr1 ru me1"`
 }
 
 // ErrorResponse represents an API error response

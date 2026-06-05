@@ -1,5 +1,8 @@
--- Create database schema
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+-- This file is intentionally left empty.
+-- Schema is managed by golang-migrate using 001_init.up.sql / 001_init.down.sql.
+-- Docker Compose mounts this directory into postgres initdb, which will pick up
+-- 001_init.up.sql automatically on first container start (alphabetical order).
+
 
 -- Summoners table
 CREATE TABLE summoners (
