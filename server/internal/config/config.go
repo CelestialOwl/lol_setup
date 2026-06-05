@@ -93,7 +93,7 @@ func Load() *Config {
 		OtelServiceName: getEnv("OTEL_SERVICE_NAME", "lol-match-tracker-api"),
 
 		// Background worker
-		RankWorkerRPM: getEnvAsInt("RANK_WORKER_RPM", 40),
+		RankWorkerRPM: getEnvAsInt("RANK_WORKER_RPM", 25),
 
 		// Rate limiting
 		RateLimitRPS:   getEnvAsFloat("RATE_LIMIT_RPS", 10),
