@@ -1,7 +1,6 @@
 package middleware
 
 import (
-	"fmt"
 	"log/slog"
 	"net/http"
 	"sync"
@@ -57,7 +56,7 @@ func (rl *IPRateLimiter) getLimiter(ip string) *rate.Limiter {
 func (rl *IPRateLimiter) RateLimit() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		ip := c.ClientIP()
-		fmt.Println("Client IP:", ip) // Debug: log client IPs
+		// fmt.Println("Client IP:", ip) // Debug: log client IPs
 		limiter := rl.getLimiter(ip)
 
 		if !limiter.Allow() {
