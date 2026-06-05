@@ -3,8 +3,8 @@
     {
       "label": "Next.js: Start Dev Server",
       "type": "shell",
-      "command": "npm",
-      "args": ["run", "dev"],
+      "command": "pnpm",
+      "args": ["dev"],
       "group": {
         "kind": "build",
         "isDefault": true
@@ -38,8 +38,8 @@
     {
       "label": "Next.js: Build",
       "type": "shell",
-      "command": "npm",
-      "args": ["run", "build"],
+      "command": "pnpm",
+      "args": ["build"],
       "group": "build",
       "presentation": {
         "echo": true,
@@ -52,8 +52,8 @@
     {
       "label": "Next.js: Lint",
       "type": "shell",
-      "command": "npm",
-      "args": ["run", "lint"],
+      "command": "pnpm",
+      "args": ["lint"],
       "group": "test",
       "presentation": {
         "echo": true,
@@ -66,7 +66,7 @@
     {
       "label": "Install Dependencies",
       "type": "shell",
-      "command": "npm",
+      "command": "pnpm",
       "args": ["install"],
       "group": "build",
       "presentation": {
