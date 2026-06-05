@@ -23,6 +23,13 @@
 /build
 /storybook-static
 
+# storybook
+/storybook-static
+
+# playwright
+/test-results
+/playwright-report
+
 # misc
 .DS_Store
 *.pem
@@ -42,3 +49,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+dragontail
+.DS_Store
