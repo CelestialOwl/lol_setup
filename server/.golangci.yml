@@ -10,21 +10,18 @@ linters:
     - gocritic       # opinionated but useful style checks
     - gosimple       # simplify code
     - unused         # unused code
-
-linters-settings:
-  govet:
-    enable-all: true
-    disable:
-      - shadow       # too noisy during initial adoption
-
-  gocritic:
-    disabled-checks:
-      - commentedOutCode
-      - hugeParam
-
-  errcheck:
-    # Allow common "unrecoverable" write errors to be ignored via //nolint:errcheck
-    check-type-assertions: true
+  settings:
+    govet:
+      enable-all: true
+      disable:
+        - shadow       # too noisy during initial adoption
+    gocritic:
+      disabled-checks:
+        - commentedOutCode
+        - hugeParam
+    errcheck:
+      # Allow common "unrecoverable" write errors to be ignored via //nolint:errcheck
+      check-type-assertions: true
 
 formatters:
   enable:
@@ -34,12 +31,13 @@ formatters:
 issues:
   max-issues-per-linter: 50
   max-same-issues: 5
-  exclude-rules:
-    # Test files: relax errcheck and unused rules
-    - path: "_test\\.go"
-      linters:
-        - errcheck
-    # Generated / vendor paths
-    - path: "vendor/"
-      linters:
-        - all
+  exclusions:
+    rules:
+      # Test files: relax errcheck and unused rules
+      - path: "_test\\.go"
+        linters:
+          - errcheck
+      # Generated / vendor paths
+      - path: "vendor/"
+        linters:
+          - all

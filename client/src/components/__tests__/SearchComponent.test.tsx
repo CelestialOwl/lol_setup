@@ -10,7 +10,8 @@ describe("SearchComponent", () => {
 
     render(<SearchComponent onSearch={onSearch} loading={false} />);
 
-    await user.type(screen.getByLabelText(/summoner/i), "Khoji#777");
+    await user.type(screen.getByLabelText(/summoner name/i), "Khoji");
+    await user.type(screen.getByLabelText(/tag line/i), "777");
     await user.selectOptions(screen.getByLabelText(/region/i), "euw1");
     await user.click(screen.getByRole("button", { name: /search/i }));
 
@@ -24,7 +25,8 @@ describe("SearchComponent", () => {
   it("disables form controls while loading", () => {
     render(<SearchComponent onSearch={vi.fn()} loading={true} />);
 
-    expect(screen.getByLabelText(/summoner/i)).toBeDisabled();
+    expect(screen.getByLabelText(/summoner name/i)).toBeDisabled();
+    expect(screen.getByLabelText(/tag line/i)).toBeDisabled();
     expect(screen.getByLabelText(/region/i)).toBeDisabled();
   });
 });
