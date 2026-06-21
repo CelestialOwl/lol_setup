@@ -9,16 +9,29 @@ interface SearchComponentProps {
 }
 
 export default function SearchComponent({ onSearch, loading }: SearchComponentProps) {
-  const [gameName, setGameName] = useState('');
-  const [tagLine, setTagLine] = useState('');
+  const [searchInput, setSearchInput] = useState('');
   const [region, setRegion] = useState('euw1');
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const trimmedName = gameName.trim();
-    const trimmedTag = tagLine.trim();
-    if (!trimmedName || !trimmedTag) return;
-    onSearch({ gameName: trimmedName, tagLine: trimmedTag, region });
+    const trimmed = searchInput.trim();
+    if (!trimmed) return;
+
+    let gameName: string;
+    let tagLine: string;
+
+    if (trimmed.includes('#')) {
+      const parts = trimmed.split('#');
+      gameName = parts[0].trim();
+      tagLine = parts.slice(1).join('#').trim();
+    } else {
+      gameName = trimmed;
+      tagLine = region === 'euw1' ? 'EUW' : region === 'na1' ? 'NA1' : region.toUpperCase();
+    }
+
+    if (gameName && tagLine) {
+      onSearch({ gameName, tagLine, region });
+    }
   };
 
   const regions = [
@@ -44,7 +57,7 @@ export default function SearchComponent({ onSearch, loading }: SearchComponentPr
       
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="flex gap-3 items-end">
-          <div className="w-24">
+                    <div className="w-24">
             <label htmlFor="region" className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2">
               Region
             </label>
@@ -63,29 +76,15 @@ export default function SearchComponent({ onSearch, loading }: SearchComponentPr
             </select>
           </div>
           <div className="flex-1">
-            <label htmlFor="gameName" className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2">
-              Summoner Name
+            <label htmlFor="searchInput" className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2">
+              Summoner
             </label>
             <input
               type="text"
-              id="gameName"
-              value={gameName}
-              onChange={(e) => setGameName(e.target.value)}
-              placeholder="e.g. Faker"
-              className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-800 text-gray-900 dark:text-slate-100 placeholder-gray-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              disabled={loading}
-            />
-          </div>
-          <div className="w-28">
-            <label htmlFor="tagLine" className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2">
-              Tag Line
-            </label>
-            <input
-              type="text"
-              id="tagLine"
-              value={tagLine}
-              onChange={(e) => setTagLine(e.target.value)}
-              placeholder="e.g. KR1"
+              id="searchInput"
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              placeholder="Name#Tag (e.g. Faker#KR1)"
               className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-800 text-gray-900 dark:text-slate-100 placeholder-gray-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               disabled={loading}
             />
@@ -94,7 +93,7 @@ export default function SearchComponent({ onSearch, loading }: SearchComponentPr
 
         <button
           type="submit"
-          disabled={loading || !gameName.trim() || !tagLine.trim()}
+          disabled={loading || !searchInput.trim()}
           className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
         >
           {loading ? (
@@ -103,7 +102,7 @@ export default function SearchComponent({ onSearch, loading }: SearchComponentPr
               Searching...
             </div>
           ) : (
-            'Search Matches'
+            'Search'
           )}
         </button>
       </form>
