@@ -1,0 +1,47 @@
+# Default values for lol-observability.
+# Override with: helm install lol-observability ./lol-observability -f my-values.yaml
+
+nameOverride: ""
+fullnameOverride: ""
+
+# ─── Prometheus ────────────────────────────────────────────────────────────────
+prometheus:
+  enabled: true
+  image: prom/prometheus:v2.54.1
+  scrapeTarget: "lol-backend:8080"
+  retention: "15d"
+  storage: "10Gi"
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "256Mi"
+    limits:
+      cpu: "500m"
+      memory: "512Mi"
+
+# ─── Grafana ───────────────────────────────────────────────────────────────────
+grafana:
+  enabled: true
+  image: grafana/grafana:11.3.0
+  storage: "2Gi"
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+    limits:
+      cpu: "300m"
+      memory: "256Mi"
+  # Sensitive — provide via --set or a separate secrets file, NOT committed to source control
+  adminPassword: ""   # required
+
+# ─── Jaeger ────────────────────────────────────────────────────────────────────
+jaeger:
+  enabled: true
+  image: jaegertracing/all-in-one:latest
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+    limits:
+      cpu: "500m"
+      memory: "512Mi"

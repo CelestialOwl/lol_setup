@@ -1,0 +1,14 @@
+apiVersion: v2
+name: lol-backend
+description: Helm chart for the LoL Match Tracker Go API
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+keywords:
+  - lol
+  - match-tracker
+  - go
+  - gin
+home: https://github.com/CelestialOwl/lol_setup
+maintainers:
+  - name: CelestialOwl

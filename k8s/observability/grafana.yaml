@@ -1,0 +1,486 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-datasources
+  namespace: lol-tracker
+  labels:
+    app: grafana
+data:
+  prometheus.yml: |
+    apiVersion: 1
+
+    datasources:
+      - name: Prometheus
+        type: prometheus
+        access: proxy
+        url: http://prometheus:9090
+        isDefault: true
+        editable: false
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboard-provider
+  namespace: lol-tracker
+  labels:
+    app: grafana
+data:
+  dashboard.yml: |
+    apiVersion: 1
+
+    providers:
+      - name: "LoL Tracker"
+        orgId: 1
+        type: file
+        disableDeletion: false
+        updateIntervalSeconds: 30
+        options:
+          path: /var/lib/grafana/dashboards
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboards
+  namespace: lol-tracker
+  labels:
+    app: grafana
+data:
+  lol-tracker.json: |
+    {
+      "id": null,
+      "uid": "lol-tracker-main",
+      "title": "LoL Match Tracker",
+      "tags": ["lol", "golang"],
+      "timezone": "browser",
+      "schemaVersion": 39,
+      "refresh": "30s",
+      "time": { "from": "now-1h", "to": "now" },
+      "panels": [
+        {
+          "id": 1,
+          "title": "Request Rate (RPM)",
+          "type": "timeseries",
+          "gridPos": { "x": 0, "y": 0, "w": 12, "h": 7 },
+          "targets": [
+            {
+              "datasource": { "type": "prometheus" },
+              "expr": "sum(rate(http_requests_total[1m])) by (route) * 60",
+              "legendFormat": "{{route}}",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "reqpm",
+              "custom": { "lineWidth": 2, "fillOpacity": 10 }
+            }
+          }
+        },
+        {
+          "id": 2,
+          "title": "Request Duration p50 / p95 / p99",
+          "type": "timeseries",
+          "gridPos": { "x": 12, "y": 0, "w": 12, "h": 7 },
+          "targets": [
+            {
+              "datasource": { "type": "prometheus" },
+              "expr": "histogram_quantile(0.50, sum(rate(http_request_duration_seconds_bucket[5m])) by (le, route))",
+              "legendFormat": "p50 {{route}}",
+              "refId": "A"
+            },
+            {
+              "datasource": { "type": "prometheus" },
+              "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le, route))",
+              "legendFormat": "p95 {{route}}",
+              "refId": "B"
+            },
+            {
+              "datasource": { "type": "prometheus" },
+              "expr": "histogram_quantile(0.99, sum(rate(http_request_duration_seconds_bucket[5m])) by (le, route))",
+              "legendFormat": "p99 {{route}}",
+              "refId": "C"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": { "unit": "s" }
+          }
+        },
+        {
+          "id": 3,
+          "title": "HTTP Error Rate (5xx)",
+          "type": "timeseries",
+          "gridPos": { "x": 0, "y": 7, "w": 8, "h": 7 },
+          "targets": [
+            {
+              "datasource": { "type": "prometheus" },
+              "expr": "sum(rate(http_requests_total{status_code=~\"5..\"}[5m])) by (route)",
+              "legendFormat": "{{route}}",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "reqps",
+              "color": { "mode": "fixed", "fixedColor": "red" }
+            }
+          }
+        },
+        {
+          "id": 4,
+          "title": "Cache Hit Rate %",
+          "type": "gauge",
+          "gridPos": { "x": 8, "y": 7, "w": 8, "h": 7 },
+          "targets": [
+            {
+              "datasource": { "type": "prometheus" },
+              "expr": "100 * sum(rate(cache_operations_total{result=\"hit\"}[5m])) / (sum(rate(cache_operations_total{operation=\"get\"}[5m])) > 0)",
+              "legendFormat": "Hit rate",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percent",
+              "min": 0,
+              "max": 100,
+              "thresholds": {
+                "steps": [
+                  { "color": "red", "value": 0 },
+                  { "color": "yellow", "value": 50 },
+                  { "color": "green", "value": 80 }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "id": 5,
+          "title": "Cache Operation Latency p95",
+          "type": "timeseries",
+          "gridPos": { "x": 16, "y": 7, "w": 8, "h": 7 },
+          "targets": [
+            {
+              "datasource": { "type": "prometheus" },
+              "expr": "histogram_quantile(0.95, sum(rate(cache_operation_duration_seconds_bucket[5m])) by (le, operation))",
+              "legendFormat": "p95 {{operation}}",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": { "unit": "s" }
+          }
+        },
+        {
+          "id": 6,
+          "title": "Data Source Resolution (cache / DB / Riot API)",
+          "type": "timeseries",
+          "gridPos": { "x": 0, "y": 14, "w": 12, "h": 8 },
+          "targets": [
+            {
+              "datasource": { "type": "prometheus" },
+              "expr": "sum(rate(resolution_total[5m])) by (operation, source)",
+              "legendFormat": "{{operation}} → {{source}}",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "reqps",
+              "custom": { "fillOpacity": 20, "lineWidth": 2, "stacking": { "mode": "normal" } }
+            }
+          }
+        },
+        {
+          "id": 7,
+          "title": "DB Query Duration p95",
+          "type": "timeseries",
+          "gridPos": { "x": 12, "y": 14, "w": 12, "h": 8 },
+          "targets": [
+            {
+              "datasource": { "type": "prometheus" },
+              "expr": "histogram_quantile(0.95, sum(rate(db_query_duration_seconds_bucket[5m])) by (le, operation))",
+              "legendFormat": "p95 {{operation}}",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": { "unit": "s" }
+          }
+        },
+        {
+          "id": 8,
+          "title": "Riot API — Requests per Minute / Hour / Day",
+          "type": "stat",
+          "gridPos": { "x": 0, "y": 22, "w": 8, "h": 6 },
+          "targets": [
+            {
+              "datasource": { "type": "prometheus" },
+              "expr": "sum(increase(riot_api_calls_total[1m]))",
+              "legendFormat": "Last 1 min",
+              "refId": "A"
+            },
+            {
+              "datasource": { "type": "prometheus" },
+              "expr": "sum(increase(riot_api_calls_total[1h]))",
+              "legendFormat": "Last 1 hour",
+              "refId": "B"
+            },
+            {
+              "datasource": { "type": "prometheus" },
+              "expr": "sum(increase(riot_api_calls_total[24h]))",
+              "legendFormat": "Last 24 hours",
+              "refId": "C"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "thresholds": {
+                "steps": [
+                  { "color": "green", "value": 0 },
+                  { "color": "yellow", "value": 60 },
+                  { "color": "red", "value": 100 }
+                ]
+              }
+            }
+          },
+          "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "orientation": "vertical" }
+        },
+        {
+          "id": 9,
+          "title": "Riot API — Call Rate by Endpoint",
+          "type": "timeseries",
+          "gridPos": { "x": 8, "y": 22, "w": 8, "h": 6 },
+          "targets": [
+            {
+              "datasource": { "type": "prometheus" },
+              "expr": "sum(rate(riot_api_calls_total[1m])) by (endpoint) * 60",
+              "legendFormat": "{{endpoint}}",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": { "unit": "reqpm" }
+          }
+        },
+        {
+          "id": 10,
+          "title": "Riot API — Status Code Breakdown",
+          "type": "piechart",
+          "gridPos": { "x": 16, "y": 22, "w": 8, "h": 6 },
+          "targets": [
+            {
+              "datasource": { "type": "prometheus" },
+              "expr": "sum(increase(riot_api_calls_total[1h])) by (status_code)",
+              "legendFormat": "{{status_code}}",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": { "unit": "short" }
+          }
+        },
+        {
+          "id": 11,
+          "title": "Rank Worker — Queue Depth",
+          "type": "stat",
+          "gridPos": { "x": 0, "y": 28, "w": 6, "h": 5 },
+          "targets": [
+            {
+              "datasource": { "type": "prometheus" },
+              "expr": "rank_worker_queue_depth",
+              "legendFormat": "queued",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "color": { "mode": "thresholds" },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 50 },
+                  { "color": "red", "value": 500 }
+                ]
+              }
+            }
+          },
+          "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "orientation": "auto", "textMode": "auto", "colorMode": "background" }
+        },
+        {
+          "id": 12,
+          "title": "Rank Worker — Tasks Processed / min",
+          "type": "timeseries",
+          "gridPos": { "x": 6, "y": 28, "w": 10, "h": 5 },
+          "targets": [
+            {
+              "datasource": { "type": "prometheus" },
+              "expr": "sum(rate(rank_worker_tasks_total[1m])) by (result) * 60",
+              "legendFormat": "{{result}}",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "custom": { "lineWidth": 2, "fillOpacity": 10 }
+            },
+            "overrides": [
+              { "matcher": { "id": "byName", "options": "failed" }, "properties": [{ "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }] },
+              { "matcher": { "id": "byName", "options": "success" }, "properties": [{ "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } }] }
+            ]
+          }
+        },
+        {
+          "id": 13,
+          "title": "Rank Worker — Tasks Dropped (total)",
+          "type": "stat",
+          "gridPos": { "x": 16, "y": 28, "w": 8, "h": 5 },
+          "targets": [
+            {
+              "datasource": { "type": "prometheus" },
+              "expr": "rank_worker_tasks_dropped_total",
+              "legendFormat": "dropped",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "color": { "mode": "thresholds" },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "red", "value": 1 }
+                ]
+              }
+            }
+          },
+          "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "orientation": "auto", "textMode": "auto", "colorMode": "background" }
+        }
+      ]
+    }
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: grafana-secret
+  namespace: lol-tracker
+  labels:
+    app: grafana
+type: Opaque
+stringData:
+  GF_SECURITY_ADMIN_PASSWORD: "admin"   # replace before production
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: grafana-pvc
+  namespace: lol-tracker
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 2Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: grafana
+  namespace: lol-tracker
+  labels:
+    app: grafana
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: grafana
+  template:
+    metadata:
+      labels:
+        app: grafana
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 472   # grafana user in official image
+        fsGroup: 472
+      containers:
+        - name: grafana
+          image: grafana/grafana:11.3.0
+          ports:
+            - name: http
+              containerPort: 3000
+          env:
+            - name: GF_SECURITY_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: grafana-secret
+                  key: GF_SECURITY_ADMIN_PASSWORD
+            - name: GF_USERS_ALLOW_SIGN_UP
+              value: "false"
+            - name: GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH
+              value: "/var/lib/grafana/dashboards/lol-tracker.json"
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "300m"
+              memory: "256Mi"
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/grafana
+            - name: datasources
+              mountPath: /etc/grafana/provisioning/datasources
+              readOnly: true
+            - name: dashboard-provider
+              mountPath: /etc/grafana/provisioning/dashboards
+              readOnly: true
+            - name: dashboards
+              mountPath: /var/lib/grafana/dashboards
+              readOnly: true
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: 3000
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: 3000
+            initialDelaySeconds: 30
+            periodSeconds: 30
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: grafana-pvc
+        - name: datasources
+          configMap:
+            name: grafana-datasources
+        - name: dashboard-provider
+          configMap:
+            name: grafana-dashboard-provider
+        - name: dashboards
+          configMap:
+            name: grafana-dashboards
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: grafana
+  namespace: lol-tracker
+  labels:
+    app: grafana
+spec:
+  selector:
+    app: grafana
+  ports:
+    - name: http
+      port: 3000
+      targetPort: 3000
+  type: ClusterIP

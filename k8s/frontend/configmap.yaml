@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: frontend-config
+  namespace: lol-tracker
+  labels:
+    app: lol-frontend
+data:
+  NEXT_PUBLIC_API_URL: "http://lol-backend.lol-tracker.svc.cluster.local"
+  NODE_ENV: "production"

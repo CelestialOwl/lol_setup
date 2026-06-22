@@ -1,0 +1,70 @@
+# Default values for lol-frontend.
+# Override with: helm install lol-frontend ./lol-frontend -f my-values.yaml
+
+replicaCount: 2
+
+image:
+  repository: ghcr.io/celestialowl/lol-frontend
+  tag: latest
+  pullPolicy: Always
+
+nameOverride: ""
+fullnameOverride: ""
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 3000
+
+ingress:
+  enabled: true
+  className: nginx
+  host: lol-tracker.example.com   # replace with your domain
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+  tls: []
+  # tls:
+  #   - secretName: lol-tracker-tls
+  #     hosts:
+  #       - lol-tracker.example.com
+
+resources:
+  requests:
+    cpu: "100m"
+    memory: "256Mi"
+  limits:
+    cpu: "500m"
+    memory: "512Mi"
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 8
+  targetCPUUtilizationPercentage: 70
+
+env:
+  NEXT_PUBLIC_API_URL: "http://lol-backend.lol-tracker.svc.cluster.local"
+  NODE_ENV: "production"
+
+probes:
+  readiness:
+    path: /
+    initialDelaySeconds: 15
+    periodSeconds: 10
+    failureThreshold: 3
+  liveness:
+    path: /
+    initialDelaySeconds: 30
+    periodSeconds: 20
+    failureThreshold: 3
+
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 1001
+  fsGroup: 1001
+  container:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: false   # Next.js writes to .next/ at runtime
+    capabilities:
+      drop:
+        - ALL

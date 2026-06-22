@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: lol-backend
+  namespace: lol-tracker
+  labels:
+    app: lol-backend
+spec:
+  selector:
+    app: lol-backend
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8080
+      protocol: TCP
+  type: ClusterIP

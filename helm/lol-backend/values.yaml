@@ -1,0 +1,70 @@
+# Default values for lol-backend.
+# Override with: helm install lol-backend ./lol-backend -f my-values.yaml
+
+replicaCount: 2
+
+image:
+  repository: ghcr.io/celestialowl/lol-backend
+  tag: latest
+  pullPolicy: Always
+
+nameOverride: ""
+fullnameOverride: ""
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 8080
+
+resources:
+  requests:
+    cpu: "100m"
+    memory: "128Mi"
+  limits:
+    cpu: "500m"
+    memory: "256Mi"
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+
+env:
+  DB_HOST: "postgres"
+  DB_PORT: "5432"
+  DB_NAME: "lol_tracker"
+  DB_USER: "postgres"
+  REDIS_URL: "redis:6379"
+  GIN_MODE: "release"
+  OTEL_ENDPOINT: "jaeger:4318"
+  OTEL_SERVICE_NAME: "lol-match-tracker-api"
+
+# Sensitive values — provide via --set or a separate secrets file, NOT committed to source control
+secrets:
+  DB_PASSWORD: ""        # required
+  RIOT_API_KEY: ""       # required
+
+probes:
+  readiness:
+    path: /health
+    initialDelaySeconds: 10
+    periodSeconds: 10
+    failureThreshold: 3
+  liveness:
+    path: /health
+    initialDelaySeconds: 20
+    periodSeconds: 20
+    failureThreshold: 3
+
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  fsGroup: 1000
+  container:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    capabilities:
+      drop:
+        - ALL
